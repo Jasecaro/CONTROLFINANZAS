@@ -25,6 +25,8 @@ const db = getFirestore(app);
 let currentUser = null;
 let currentProfile = 'empresa'; // 'empresa' or 'personal'
 let unsubscribeTransactions = null;
+let sortField = 'date';
+let sortDirection = 'desc';
 
 // --- 1. CONFIGURATION & DOM REFERENCES ---
 const CATEGORIES = {
@@ -563,8 +565,39 @@ function renderTransactionsTable() {
         return matchQuery && matchType && matchCategory && matchStatus && matchPeriod;
     });
     
-    // Sort transactions chronologically desc
-    filtered.sort((a, b) => new Date(b.date) - new Date(a.date));
+    // Sort transactions dynamically
+    filtered.sort((a, b) => {
+        let valA, valB;
+        if (sortField === 'date') {
+            valA = new Date(a.date);
+            valB = new Date(b.date);
+            return sortDirection === 'asc' ? valA - valB : valB - valA;
+        } else if (sortField === 'amount') {
+            valA = Number(a.amount) || 0;
+            valB = Number(b.amount) || 0;
+            return sortDirection === 'asc' ? valA - valB : valB - valA;
+        } else if (sortField === 'type') {
+            valA = a.type === 'income' ? 'Ingreso' : 'Gasto';
+            valB = b.type === 'income' ? 'Ingreso' : 'Gasto';
+        } else if (sortField === 'category') {
+            valA = getCategoryLabel(a.type, a.category);
+            valB = getCategoryLabel(b.type, b.category);
+        } else if (sortField === 'reference') {
+            valA = a.reference || '';
+            valB = b.reference || '';
+        } else if (sortField === 'status') {
+            valA = a.status === 'paid' ? 'Cobrado' : 'Pendiente';
+            valB = b.status === 'paid' ? 'Cobrado' : 'Pendiente';
+        } else {
+            valA = new Date(a.date);
+            valB = new Date(b.date);
+            return valB - valA;
+        }
+        
+        return sortDirection === 'asc' 
+            ? valA.localeCompare(valB, 'es', { sensitivity: 'base' }) 
+            : valB.localeCompare(valA, 'es', { sensitivity: 'base' });
+    });
     
     // Handle empty state
     if (filtered.length === 0) {
@@ -575,6 +608,22 @@ function renderTransactionsTable() {
         elements.tableEmptyState.style.display = 'none';
         elements.mainTransactionsTable.style.display = 'table';
     }
+    
+    // Update sort headers styling and icons in HTML
+    const headers = elements.mainTransactionsTable.querySelectorAll('th.sortable');
+    headers.forEach(th => {
+        const field = th.getAttribute('data-sort');
+        const icon = th.querySelector('.sort-icon');
+        if (icon) {
+            if (field === sortField) {
+                th.classList.add('active-sort');
+                icon.setAttribute('data-lucide', sortDirection === 'asc' ? 'arrow-up' : 'arrow-down');
+            } else {
+                th.classList.remove('active-sort');
+                icon.setAttribute('data-lucide', 'arrow-up-down');
+            }
+        }
+    });
     
     elements.tableTransactionsBody.innerHTML = '';
     
@@ -634,13 +683,13 @@ function renderTransactionsTable() {
         elements.tableTransactionsBody.appendChild(tr);
     });
     
-    // Setup icons inside the table
+    // Setup icons inside the table header and body
     lucide.createIcons({
         attrs: {
             'data-lucide': true
         },
         nameAttr: 'data-lucide',
-        nodeList: elements.tableTransactionsBody.querySelectorAll('[data-lucide]')
+        nodeList: elements.mainTransactionsTable.querySelectorAll('[data-lucide]')
     });
 }
 
@@ -1572,6 +1621,23 @@ function setupFilters() {
     if (elements.inputImportJson) {
         elements.inputImportJson.addEventListener('change', importFromJSON);
     }
+    
+    // Setup sorting column clicks
+    const headers = elements.mainTransactionsTable.querySelectorAll('th.sortable');
+    headers.forEach(th => {
+        th.addEventListener('click', () => {
+            const field = th.getAttribute('data-sort');
+            if (sortField === field) {
+                // Toggle direction
+                sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+            } else {
+                // New field, default to desc for date/amount, asc for text fields
+                sortField = field;
+                sortDirection = (field === 'date' || field === 'amount') ? 'desc' : 'asc';
+            }
+            renderTransactionsTable();
+        });
+    });
 }
 
 function populatePeriodFilter() {
