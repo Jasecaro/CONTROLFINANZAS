@@ -521,7 +521,7 @@ function renderRecentTable() {
                 </div>
             </td>
             <td>${tx.reference}</td>
-            <td class="type-cell ${tx.type}">${tx.type === 'income' ? '+' : '-'}&nbsp;${formatCurrency(tx.amount)}</td>
+            <td class="amount-cell ${tx.type}">${tx.type === 'income' ? '+' : '-'}&nbsp;${formatCurrency(tx.amount)}</td>
             <td>
                 <span class="status-badge ${tx.status}" onclick="toggleStatus('${tx.id}')">
                     <i data-lucide="${tx.status === 'paid' ? 'check-circle' : 'clock'}"></i>
@@ -606,7 +606,7 @@ function renderTransactionsTable() {
                 </div>
             </td>
             <td style="max-width: 230px; font-weight:600;">${tx.reference}</td>
-            <td class="type-cell ${tx.type}">${tx.type === 'income' ? '+' : '-'}&nbsp;${formatCurrency(tx.amount)}</td>
+            <td class="amount-cell ${tx.type}">${tx.type === 'income' ? '+' : '-'}&nbsp;${formatCurrency(tx.amount)}</td>
             <td>
                 <span class="status-badge ${tx.status}" onclick="toggleStatus('${tx.id}')" title="Haz clic para cambiar estado">
                     <i data-lucide="${tx.status === 'paid' ? 'check-circle' : 'clock'}"></i>

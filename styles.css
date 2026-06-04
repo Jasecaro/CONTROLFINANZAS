@@ -2168,4 +2168,18 @@ body.personal-theme {
     }
 }
 
+/* Amount cell styling for table alignment */
+.amount-cell {
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.amount-cell.income {
+    color: var(--color-income);
+}
+
+.amount-cell.expense {
+    color: var(--color-expense);
+}
+
 
