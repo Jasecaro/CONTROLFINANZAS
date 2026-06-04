@@ -20,6 +20,7 @@ const CATEGORIES = {
         { value: 'expense-supplies', label: 'Suministros e Imprenta', group: 'Oficina' },
         { value: 'expense-marketing', label: 'Publicidad & Marketing', group: 'Oficina' },
         { value: 'expense-salaries', label: 'Sueldos & Honorarios', group: 'Oficina' },
+        { value: 'expense-taxes', label: 'Impuestos', group: 'Oficina' },
         { value: 'expense-other', label: 'Otros Gastos', group: 'Oficina' }
     ]
 };
