@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Caro & Sebastiani Finanzas | Control de Finanzas de Abogados & Corretaje</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Lucide Icons CDN -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="dark-theme">
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="logo-wrapper">
+                    <div class="logo-icon">
+                        <i data-lucide="scale"></i>
+                    </div>
+                    <div class="logo-text">
+                        <span class="logo-title">Caro & Sebastiani</span>
+                        <span class="logo-subtitle">Finanzas</span>
+                    </div>
+                </div>
+            </div>
+
+            <nav class="sidebar-nav">
+                <button class="nav-btn active" data-view="dashboard" id="nav-dashboard">
+                    <i data-lucide="layout-dashboard"></i>
+                    <span>Panel de Control</span>
+                </button>
+                <button class="nav-btn" data-view="transactions" id="nav-transactions">
+                    <i data-lucide="arrow-left-right"></i>
+                    <span>Transacciones</span>
+                </button>
+                <button class="nav-btn" data-view="reports" id="nav-reports">
+                    <i data-lucide="pie-chart"></i>
+                    <span>Reportes & Análisis</span>
+                </button>
+            </nav>
+
+            <div class="sidebar-footer">
+                <button class="btn btn-primary btn-add-transaction" id="btn-open-modal">
+                    <i data-lucide="plus-circle"></i>
+                    <span>Nueva Transacción</span>
+                </button>
+                <div class="user-profile">
+                    <div class="avatar">CS</div>
+                    <div class="user-info">
+                        <p class="user-name">Caro & Sebastiani</p>
+                        <p class="user-role">Administrador</p>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <!-- Header -->
+            <header class="main-header">
+                <div class="header-left">
+                    <h1 class="page-title" id="page-current-title">Panel de Control</h1>
+                    <p class="header-subtitle" id="header-current-subtitle">Bienvenido, aquí está el resumen financiero de tu oficina.</p>
+                </div>
+                <div class="header-right">
+                    <div class="date-badge">
+                        <i data-lucide="calendar"></i>
+                        <span id="current-date-text">Lunes, 1 de Junio de 2026</span>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Views Container -->
+            <div class="view-wrapper">
+                
+                <!-- VIEW: DASHBOARD -->
+                <section id="view-dashboard" class="app-view active">
+                    <!-- Dashboard Filter Bar -->
+                    <div class="dashboard-filter-bar">
+                        <div class="filter-bar-left">
+                            <span class="filter-bar-label">Filtrar Panel por:</span>
+                            <div class="select-wrapper">
+                                <select id="dashboard-period-select" class="form-select">
+                                    <option value="all">Histórico (Todo el tiempo)</option>
+                                    <option value="current-year">Año Actual (2026)</option>
+                                    <!-- Dynamic month-year options populated via JS -->
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Metrics Grid -->
+                    <div class="metrics-grid">
+                        <div class="metric-card card-balance">
+                            <div class="card-bg-gradient"></div>
+                            <div class="card-header-metric">
+                                <span class="metric-label">Balance Neto</span>
+                                <div class="metric-icon icon-balance">
+                                    <i data-lucide="wallet"></i>
+                                </div>
+                            </div>
+                            <div class="metric-value" id="val-net-balance">$0</div>
+                            <div class="metric-footer">
+                                <span class="trend-badge trend-neutral" id="lbl-balance-trend">
+                                    <i data-lucide="activity"></i> Caja Actual
+                                </span>
+                            </div>
+                        </div>
+
+                        <div class="metric-card card-income-judicial">
+                            <div class="card-header-metric">
+                                <span class="metric-label">Ingresos Judiciales</span>
+                                <div class="metric-icon icon-judicial">
+                                    <i data-lucide="gavel"></i>
+                                </div>
+                            </div>
+                            <div class="metric-value text-judicial" id="val-income-judicial">$0</div>
+                            <div class="metric-footer">
+                                <span class="metric-subtext" id="lbl-judicial-count">0 transacciones</span>
+                            </div>
+                        </div>
+
+                        <div class="metric-card card-income-brokerage">
+                            <div class="card-header-metric">
+                                <span class="metric-label">Ingresos Corretaje</span>
+                                <div class="metric-icon icon-brokerage">
+                                    <i data-lucide="home"></i>
+                                </div>
+                            </div>
+                            <div class="metric-value text-brokerage" id="val-income-brokerage">$0</div>
+                            <div class="metric-footer">
+                                <span class="metric-subtext" id="lbl-brokerage-count">0 transacciones</span>
+                            </div>
+                        </div>
+
+                        <div class="metric-card card-expenses">
+                            <div class="card-header-metric">
+                                <span class="metric-label">Gastos Totales</span>
+                                <div class="metric-icon icon-expense">
+                                    <i data-lucide="trending-down"></i>
+                                </div>
+                            </div>
+                            <div class="metric-value text-expense" id="val-total-expenses">$0</div>
+                            <div class="metric-footer">
+                                <span class="metric-subtext" id="lbl-expenses-count">0 transacciones</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Charts & Recent Split -->
+                    <div class="dashboard-split-grid">
+                        <!-- Chart Card -->
+                        <div class="dashboard-card card-chart-main">
+                            <div class="card-title-bar">
+                                <h3>Flujo de Caja Mensual</h3>
+                                <div class="chart-legend">
+                                    <span class="legend-item"><span class="dot dot-income"></span>Ingresos</span>
+                                    <span class="legend-item"><span class="dot dot-expense"></span>Gastos</span>
+                                </div>
+                            </div>
+                            <div class="chart-container">
+                                <canvas id="chart-cashflow-trend"></canvas>
+                            </div>
+                        </div>
+
+                        <!-- Mini Distributions Card -->
+                        <div class="dashboard-card card-chart-dist">
+                            <div class="card-title-bar">
+                                <h3>Distribución de Ingresos</h3>
+                            </div>
+                            <div class="chart-container doughnut-wrapper">
+                                <canvas id="chart-income-dist"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Recent Transactions -->
+                    <div class="dashboard-card recent-transactions-card">
+                        <div class="card-title-bar">
+                            <h3>Transacciones Recientes</h3>
+                            <button class="btn btn-text text-primary btn-go-transactions">
+                                <span>Ver todas</span>
+                                <i data-lucide="arrow-right"></i>
+                            </button>
+                        </div>
+                        <div class="table-container minimal">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Fecha</th>
+                                        <th>Tipo / Categoría</th>
+                                        <th>Cliente / Caso</th>
+                                        <th>Monto</th>
+                                        <th>Estado</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="table-recent-body">
+                                    <!-- Dynamic rows loaded here -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- VIEW: TRANSACTIONS -->
+                <section id="view-transactions" class="app-view">
+                    <!-- Filters and controls card -->
+                    <div class="dashboard-card filters-card">
+                        <div class="filters-header">
+                            <div class="search-box">
+                                <i data-lucide="search"></i>
+                                <input type="text" id="filter-search" placeholder="Buscar cliente, caso, propiedad o notas...">
+                            </div>
+                            <div class="action-buttons" style="display: flex; gap: 8px; flex-wrap: wrap;">
+                                <button class="btn btn-secondary" id="btn-export-csv" title="Exportar datos a Excel/CSV">
+                                    <i data-lucide="download"></i>
+                                    <span>Exportar CSV</span>
+                                </button>
+                                <button class="btn btn-secondary" id="btn-export-json" title="Guardar copia de seguridad en archivo para llevar a casa">
+                                    <i data-lucide="database"></i>
+                                    <span>Respaldar Datos</span>
+                                </button>
+                                <button class="btn btn-secondary" id="btn-import-json" title="Cargar copia de seguridad desde otro PC">
+                                    <i data-lucide="upload"></i>
+                                    <span>Restaurar Datos</span>
+                                </button>
+                                <input type="file" id="input-import-json" accept=".json" style="display: none;">
+                                <button class="btn btn-danger" id="btn-clear-all" title="Borrar todas las transacciones para comenzar de cero">
+                                    <i data-lucide="trash-2"></i>
+                                    <span>Borrar Datos</span>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="filters-row">
+                            <div class="filter-group">
+                                <label for="filter-type">Tipo</label>
+                                <select id="filter-type" class="form-select">
+                                    <option value="all">Todos</option>
+                                    <option value="income">Ingresos</option>
+                                    <option value="expense">Gastos</option>
+                                </select>
+                            </div>
+                            <div class="filter-group">
+                                <label for="filter-category">Categoría</label>
+                                <select id="filter-category" class="form-select">
+                                    <option value="all">Todas las Categorías</option>
+                                    <optgroup label="Ingresos Judiciales">
+                                        <option value="judicial-litigation">Honorarios de Litigio</option>
+                                        <option value="judicial-consultancy">Asesoría / Consultoría</option>
+                                        <option value="judicial-notary">Trámites Notariales</option>
+                                    </optgroup>
+                                    <optgroup label="Ingresos Corretaje">
+                                        <option value="brokerage-sale">Comisión por Venta</option>
+                                        <option value="brokerage-rental">Comisión por Arriendo</option>
+                                        <option value="brokerage-administration">Administración de Propiedades</option>
+                                    </optgroup>
+                                    <optgroup label="Gastos de Oficina">
+                                        <option value="expense-rent">Arriendo de Oficina</option>
+                                        <option value="expense-luz">Servicio de Luz</option>
+                                        <option value="expense-agua">Servicio de Agua</option>
+                                        <option value="expense-internet">Internet & Telecomunicaciones</option>
+                                        <option value="expense-supplies">Suministros e Imprenta</option>
+                                        <option value="expense-marketing">Publicidad & Marketing</option>
+                                        <option value="expense-salaries">Sueldos & Honorarios Oficina</option>
+                                        <option value="expense-other">Otros Gastos</option>
+                                    </optgroup>
+                                </select>
+                            </div>
+                            <div class="filter-group">
+                                <label for="filter-status">Estado</label>
+                                <select id="filter-status" class="form-select">
+                                    <option value="all">Todos</option>
+                                    <option value="paid">Pagado</option>
+                                    <option value="pending">Pendiente</option>
+                                </select>
+                            </div>
+                            <div class="filter-group">
+                                <label for="filter-month">Período</label>
+                                <select id="filter-month" class="form-select">
+                                    <option value="all">Todos los tiempos</option>
+                                    <!-- Populated dynamically via JS -->
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Transactions Table -->
+                    <div class="dashboard-card table-main-card">
+                        <div class="table-container">
+                            <table class="data-table" id="main-transactions-table">
+                                <thead>
+                                    <tr>
+                                        <th>Fecha</th>
+                                        <th>Tipo</th>
+                                        <th>Categoría</th>
+                                        <th>Cliente / Caso / Propiedad</th>
+                                        <th>Monto</th>
+                                        <th>Estado</th>
+                                        <th>Notas</th>
+                                        <th class="text-right">Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="table-transactions-body">
+                                    <!-- Dynamic rows -->
+                                </tbody>
+                            </table>
+                            <div class="empty-state" id="table-empty-state">
+                                <div class="empty-state-icon">
+                                    <i data-lucide="receipt"></i>
+                                </div>
+                                <h4>No hay transacciones registradas</h4>
+                                <p>Crea una nueva transacción para empezar a controlar las finanzas de tu oficina.</p>
+                                <button class="btn btn-primary" id="btn-empty-add">
+                                    <i data-lucide="plus"></i> Registrar Primera Transacción
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- VIEW: REPORTS -->
+                <section id="view-reports" class="app-view">
+                    <!-- Top stats cards specific to reports -->
+                    <div class="metrics-grid reports-stats">
+                        <div class="metric-card">
+                            <div class="card-header-metric">
+                                <span class="metric-label">Margen de Rentabilidad</span>
+                                <div class="metric-icon icon-balance">
+                                    <i data-lucide="trending-up"></i>
+                                </div>
+                            </div>
+                            <div class="metric-value text-primary" id="val-profit-margin">0%</div>
+                            <div class="metric-footer">
+                                <span class="metric-subtext">Porcentaje de ingresos netos</span>
+                            </div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="card-header-metric">
+                                <span class="metric-label">Monto en Cuentas Pendientes</span>
+                                <div class="metric-icon icon-expense">
+                                    <i data-lucide="clock"></i>
+                                </div>
+                            </div>
+                            <div class="metric-value text-warning" id="val-pending-collect">$0</div>
+                            <div class="metric-footer">
+                                <span class="metric-subtext" id="lbl-pending-count">0 cuentas pendientes</span>
+                            </div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="card-header-metric">
+                                <span class="metric-label">Promedio Mensual de Ingresos</span>
+                                <div class="metric-icon icon-judicial">
+                                    <i data-lucide="dollar-sign"></i>
+                                </div>
+                            </div>
+                            <div class="metric-value text-success" id="val-avg-monthly-income">$0</div>
+                            <div class="metric-footer">
+                                <span class="metric-subtext">Basado en meses con registro</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Split Grid for Report Charts -->
+                    <div class="dashboard-split-grid reports-charts-grid">
+                        <div class="dashboard-card">
+                            <div class="card-title-bar">
+                                <h3>Gastos por Categoría</h3>
+                            </div>
+                            <div class="chart-container doughnut-wrapper">
+                                <canvas id="chart-expenses-breakdown"></canvas>
+                            </div>
+                        </div>
+                        <div class="dashboard-card">
+                            <div class="card-title-bar">
+                                <h3>Comparativa Mensual (Ingresos vs Gastos)</h3>
+                            </div>
+                            <div class="chart-container">
+                                <canvas id="chart-monthly-comparison"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Summary Table -->
+                    <div class="dashboard-card">
+                        <div class="card-title-bar">
+                            <h3>Resumen Mensual Consolidado</h3>
+                        </div>
+                        <div class="table-container">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Mes / Año</th>
+                                        <th>Ingresos Judiciales</th>
+                                        <th>Ingresos Corretaje</th>
+                                        <th>Gastos Totales</th>
+                                        <th>Resultado Neto</th>
+                                        <th>Margen</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="table-summary-body">
+                                    <!-- Populated dynamically via JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+            </div>
+        </main>
+    </div>
+
+    <!-- MODAL: ADD / EDIT TRANSACTION -->
+    <div class="modal-overlay" id="transaction-modal">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 id="modal-title">Registrar Nueva Transacción</h3>
+                <button class="btn-close" id="btn-close-modal">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            <form id="transaction-form" class="modal-form">
+                <!-- Hidden input for edit mode state -->
+                <input type="hidden" id="form-tx-id" value="">
+
+                <div class="form-row-split">
+                    <!-- Type selector cards -->
+                    <div class="form-group-full">
+                        <label>Tipo de Movimiento</label>
+                        <div class="type-card-selector">
+                            <label class="type-selector-card type-income active">
+                                <input type="radio" name="tx-type" value="income" checked>
+                                <div class="selector-content">
+                                    <i data-lucide="trending-up"></i>
+                                    <span>Ingreso</span>
+                                </div>
+                            </label>
+                            <label class="type-selector-card type-expense">
+                                <input type="radio" name="tx-type" value="expense">
+                                <div class="selector-content">
+                                    <i data-lucide="trending-down"></i>
+                                    <span>Gasto</span>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-grid">
+                    <!-- Category Selection -->
+                    <div class="form-group">
+                        <label for="form-category">Categoría <span class="required">*</span></label>
+                        <select id="form-category" class="form-select" required>
+                            <!-- Populated dynamically based on Type via JS -->
+                        </select>
+                    </div>
+
+                    <!-- Date Selection -->
+                    <div class="form-group">
+                        <label for="form-date">Fecha de Pago/Cobro <span class="required">*</span></label>
+                        <input type="date" id="form-date" class="form-input" required>
+                    </div>
+
+                    <!-- Period Selection -->
+                    <div class="form-group">
+                        <label for="form-period">Mes Correspondiente <span class="required">*</span></label>
+                        <input type="month" id="form-period" class="form-input" required>
+                    </div>
+
+                    <!-- Client / Reference / Case / Property -->
+                    <div class="form-group form-group-span-2">
+                        <label for="form-reference" id="form-reference-label">Cliente o Caso Judicial <span class="required">*</span></label>
+                        <input type="text" id="form-reference" class="form-input" placeholder="Nombre de cliente, número de causa o propiedad..." required>
+                    </div>
+
+                    <!-- Amount -->
+                    <div class="form-group">
+                        <label for="form-amount">Monto ($) <span class="required">*</span></label>
+                        <input type="number" id="form-amount" class="form-input" placeholder="0" min="1" step="any" required>
+                    </div>
+
+                    <!-- Payment Status -->
+                    <div class="form-group">
+                        <label for="form-status">Estado de Pago</label>
+                        <select id="form-status" class="form-select">
+                            <option value="paid">Pagado / Cobrado</option>
+                            <option value="pending">Pendiente</option>
+                        </select>
+                    </div>
+
+                    <!-- Receipt File Attachment -->
+                    <div class="form-group form-group-span-2">
+                        <label for="form-attachment">Adjuntar Comprobante (Máx. 1MB) [Puedes pegar un pantallazo directo con Ctrl+V aquí]</label>
+                        <div class="file-upload-wrapper">
+                            <input type="file" id="form-attachment" class="form-input" accept="image/*,application/pdf">
+                            <div class="file-upload-preview" id="form-attachment-preview" style="display:none;">
+                                <span id="form-attachment-name"></span>
+                                <button type="button" class="btn btn-danger btn-icon" id="btn-remove-attachment">
+                                    <i data-lucide="trash-2"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Notes -->
+                    <div class="form-group form-group-span-2">
+                        <label for="form-notes">Detalles o Notas Adicionales</label>
+                        <textarea id="form-notes" class="form-textarea" rows="3" placeholder="Información extra del cobro o gasto (ej. Comisión 2% venta casa Av. Italia, Pago cuenta de internet de mayo...)"></textarea>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" id="btn-cancel-modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary" id="btn-save-tx">Guardar Transacción</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: TRANSACTION VOUCHER -->
+    <div class="modal-overlay" id="voucher-modal">
+        <div class="modal-card voucher-card-wrapper">
+            <div class="modal-header">
+                <h3>Comprobante de Operación</h3>
+                <button class="btn-close" id="btn-close-voucher">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            <div class="modal-body voucher-print-area" id="voucher-content">
+                <!-- Generated dynamically via JS -->
+            </div>
+            <div class="modal-footer no-print">
+                <button class="btn btn-secondary" id="btn-print-voucher">
+                    <i data-lucide="printer"></i> Imprimir Voucher
+                </button>
+                <button class="btn btn-primary" id="btn-close-voucher-foot">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification Toast -->
+    <div class="toast" id="app-toast">
+        <div class="toast-content">
+            <i data-lucide="check-circle" class="toast-icon"></i>
+            <span class="toast-message">Operación realizada con éxito</span>
+        </div>
+    </div>
+
+    <!-- Main JavaScript Logic -->
+    <script src="app.js"></script>
+</body>
+</html>
