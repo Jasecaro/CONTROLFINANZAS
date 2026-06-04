@@ -1669,3 +1669,217 @@ body {
         gap: 16px;
     }
 }
+
+/* ==========================================================================
+   15. Firebase Auth & Profile Switcher Styles
+   ========================================================================== */
+
+/* Profile Switcher in Sidebar */
+.profile-switcher-container {
+    margin-bottom: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.sidebar-section-label {
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    padding-left: 8px;
+}
+
+.profile-switcher-wrapper {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    background-color: rgba(0, 0, 0, 0.2);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 4px;
+}
+
+.profile-switch-btn {
+    background: transparent;
+    border: none;
+    color: var(--color-text-muted);
+    padding: 8px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-family: var(--font-main);
+    font-size: 0.8rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: all 0.2s ease;
+}
+
+.profile-switch-btn i {
+    width: 14px;
+    height: 14px;
+}
+
+.profile-switch-btn:hover {
+    color: var(--color-text-light);
+}
+
+.profile-switch-btn.active {
+    background: var(--color-primary-gradient);
+    color: var(--color-text-light);
+    box-shadow: var(--shadow-button);
+}
+
+/* Logout link styling */
+.btn-logout-link {
+    background: transparent;
+    border: none;
+    color: var(--color-expense);
+    cursor: pointer;
+    font-family: var(--font-main);
+    font-size: 0.72rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 0;
+    transition: opacity 0.2s ease;
+    opacity: 0.8;
+}
+
+.btn-logout-link:hover {
+    opacity: 1;
+    text-decoration: underline;
+}
+
+/* Login Overlay Styles */
+.login-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: #05070c;
+    background-image: radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.1) 0px, transparent 50%),
+                      radial-gradient(at 50% 0%, rgba(139, 92, 246, 0.05) 0px, transparent 50%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+}
+
+.login-overlay.active {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.login-card {
+    background-color: rgba(17, 24, 39, 0.6);
+    border: 1px solid var(--border-color);
+    backdrop-filter: var(--glass-blur);
+    border-radius: 24px;
+    width: 100%;
+    max-width: 420px;
+    padding: 40px;
+    box-shadow: var(--shadow-main);
+    text-align: center;
+    animation: loginCardAppear 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.login-header {
+    margin-bottom: 30px;
+}
+
+.logo-icon-login {
+    width: 56px;
+    height: 56px;
+    background: var(--color-primary-gradient);
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--color-text-light);
+    margin: 0 auto 16px auto;
+    box-shadow: var(--shadow-button);
+}
+
+.logo-icon-login i {
+    width: 28px;
+    height: 28px;
+}
+
+.login-header h3 {
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: var(--color-text-light);
+}
+
+.login-header p {
+    font-size: 0.85rem;
+    color: var(--color-primary);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    margin-top: 4px;
+}
+
+.login-form {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    text-align: left;
+}
+
+.form-group-login {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.form-group-login label {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.btn-login {
+    margin-top: 10px;
+    justify-content: center;
+    padding: 14px;
+    font-size: 0.95rem;
+}
+
+.login-error-msg {
+    font-size: 0.8rem;
+    color: var(--color-expense);
+    text-align: center;
+    margin-top: 12px;
+    min-height: 20px;
+    font-weight: 600;
+}
+
+/* Personal Theme Color Override (Dynamically changed via JS) */
+body.personal-theme {
+    --color-primary: #0ea5e9; /* Light Blue / Cyan */
+    --color-primary-hover: #0284c7;
+    --color-primary-gradient: linear-gradient(135deg, #0ea5e9 0%, #14b8a6 100%);
+    --shadow-button: 0 4px 12px rgba(14, 165, 233, 0.25);
+}
+
+@keyframes loginCardAppear {
+    from {
+        transform: translateY(30px) scale(0.95);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0) scale(1);
+        opacity: 1;
+    }
+}
+

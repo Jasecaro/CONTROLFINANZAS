@@ -30,6 +30,21 @@
                 </div>
             </div>
 
+            <!-- Profile Switcher -->
+            <div class="profile-switcher-container">
+                <span class="sidebar-section-label">Contexto Financiero</span>
+                <div class="profile-switcher-wrapper">
+                    <button class="profile-switch-btn active" id="profile-switch-empresa" data-profile="empresa">
+                        <i data-lucide="briefcase"></i>
+                        <span>Empresa</span>
+                    </button>
+                    <button class="profile-switch-btn" id="profile-switch-personal" data-profile="personal">
+                        <i data-lucide="user"></i>
+                        <span>Personal</span>
+                    </button>
+                </div>
+            </div>
+
             <nav class="sidebar-nav">
                 <button class="nav-btn active" data-view="dashboard" id="nav-dashboard">
                     <i data-lucide="layout-dashboard"></i>
@@ -51,10 +66,13 @@
                     <span>Nueva Transacción</span>
                 </button>
                 <div class="user-profile">
-                    <div class="avatar">CS</div>
-                    <div class="user-info">
-                        <p class="user-name">Caro & Sebastiani</p>
-                        <p class="user-role">Administrador</p>
+                    <div class="avatar" id="user-avatar-initials">CS</div>
+                    <div class="user-info" style="flex-grow: 1; min-width: 0;">
+                        <p class="user-name" id="user-display-email" style="font-size: 0.72rem; word-break: break-all; margin-bottom: 2px; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">Cargando...</p>
+                        <button class="btn-logout-link" id="btn-logout" title="Cerrar Sesión">
+                            <i data-lucide="log-out" style="width: 12px; height: 12px; vertical-align: middle;"></i>
+                            <span style="font-size: 0.72rem; vertical-align: middle;">Cerrar Sesión</span>
+                        </button>
                     </div>
                 </div>
             </div>
@@ -587,7 +605,35 @@
         </div>
     </div>
 
+    <!-- MODAL: LOGIN OVERLAY -->
+    <div class="login-overlay active" id="login-overlay">
+        <div class="login-card">
+            <div class="login-header">
+                <div class="logo-icon-login">
+                    <i data-lucide="scale"></i>
+                </div>
+                <h3>Caro & Sebastiani</h3>
+                <p>Control de Finanzas</p>
+            </div>
+            <form id="login-form" class="login-form">
+                <div class="form-group-login">
+                    <label for="login-email">Correo Electrónico</label>
+                    <input type="email" id="login-email" class="form-input" placeholder="correo@ejemplo.com" required autocomplete="email">
+                </div>
+                <div class="form-group-login">
+                    <label for="login-password">Contraseña</label>
+                    <input type="password" id="login-password" class="form-input" placeholder="••••••••" required autocomplete="current-password">
+                </div>
+                <button type="submit" class="btn btn-primary btn-login">
+                    <i data-lucide="log-in"></i>
+                    <span>Iniciar Sesión</span>
+                </button>
+                <p class="login-error-msg" id="login-error-msg"></p>
+            </form>
+        </div>
+    </div>
+
     <!-- Main JavaScript Logic -->
-    <script src="app.js"></script>
+    <script type="module" src="app.js"></script>
 </body>
 </html>

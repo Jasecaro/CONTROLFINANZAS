@@ -2,6 +2,30 @@
    LEXPROP FINANZAS - APPLICATION LOGIC
    ========================================================================== */
 
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+import { getFirestore, collection, doc, setDoc, deleteDoc, query, where, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+// Firebase Configuration
+const firebaseConfig = {
+  apiKey: "AIzaSyCF9BugrARzleEALJc00c8S2RXT0xMIMN4",
+  authDomain: "control-finanzas-7c5f5.firebaseapp.com",
+  projectId: "control-finanzas-7c5f5",
+  storageBucket: "control-finanzas-7c5f5.firebasestorage.app",
+  messagingSenderId: "910316992640",
+  appId: "1:910316992640:web:ae296ea26ecf33a2030e65"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+// State Variables
+let currentUser = null;
+let currentProfile = 'empresa'; // 'empresa' or 'personal'
+let unsubscribeTransactions = null;
+
 // --- 1. CONFIGURATION & DOM REFERENCES ---
 const CATEGORIES = {
     income: [
@@ -120,16 +144,23 @@ const elements = {
     btnCloseReminder: document.getElementById('btn-close-reminder'),
     btnCloseReminderFoot: document.getElementById('btn-close-reminder-foot'),
     btnReminderEmail: document.getElementById('btn-reminder-email'),
-    btnReminderCopy: document.getElementById('btn-reminder-copy')
+    btnReminderCopy: document.getElementById('btn-reminder-copy'),
+
+    // Login & Profile Switcher
+    loginOverlay: document.getElementById('login-overlay'),
+    loginForm: document.getElementById('login-form'),
+    loginEmail: document.getElementById('login-email'),
+    loginPassword: document.getElementById('login-password'),
+    loginErrorMsg: document.getElementById('login-error-msg'),
+    userDisplayEmail: document.getElementById('user-display-email'),
+    userAvatarInitials: document.getElementById('user-avatar-initials'),
+    btnLogout: document.getElementById('btn-logout'),
+    profileSwitchEmpresa: document.getElementById('profile-switch-empresa'),
+    profileSwitchPersonal: document.getElementById('profile-switch-personal')
 };
 
 // --- 2. INITIALIZATION & STORAGE ---
 document.addEventListener('DOMContentLoaded', () => {
-    // Force clear old mock data exactly once to start clean
-    if (!localStorage.getItem('lexprop_cleared_v1')) {
-        localStorage.removeItem('lexprop_txs');
-        localStorage.setItem('lexprop_cleared_v1', 'true');
-    }
     initApp();
 });
 
@@ -137,8 +168,8 @@ function initApp() {
     // Setup date string in header
     setupHeaderDate();
     
-    // Load and populate transactions from Storage or Mock Data
-    loadTransactions();
+    // Set up Authentication Controls
+    setupAuthControls();
     
     // Set up Navigation
     setupNavigation();
@@ -164,39 +195,6 @@ function setupHeaderDate() {
     const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
     const dateFormatted = today.toLocaleDateString('es-ES', options);
     elements.currentDateText.textContent = dateFormatted.charAt(0).toUpperCase() + dateFormatted.slice(1);
-}
-
-function loadTransactions() {
-    const saved = localStorage.getItem('lexprop_txs');
-    if (saved) {
-        transactions = JSON.parse(saved);
-        
-        // Auto-clear mock data if it's the default first-run data to start fresh as requested
-        const hasOnlyMockData = transactions.length > 0 && transactions.every(tx => {
-            return ['tx-1', 'tx-2', 'tx-3', 'tx-4', 'tx-5', 'tx-6', 'tx-7', 'tx-7-agua', 'tx-8', 'tx-9', 'tx-10'].includes(tx.id);
-        });
-        
-        if (hasOnlyMockData) {
-            transactions = [];
-            saveToStorage();
-        } else {
-            // Robustness: Auto-patch any older records that might be missing the 'period' field
-            let needsMigration = false;
-            transactions.forEach(tx => {
-                if (!tx.period && tx.date) {
-                    tx.period = tx.date.substring(0, 7);
-                    needsMigration = true;
-                }
-            });
-            if (needsMigration) {
-                saveToStorage();
-            }
-        }
-    } else {
-        // Start clean for real data
-        transactions = [];
-        saveToStorage();
-    }
 }
 
 // Convert numbers to currency CL/General
@@ -231,10 +229,6 @@ function formatDateString(isoString) {
     const dateObj = new Date(year, month - 1, day);
     const options = { day: '2-digit', month: 'short', year: 'numeric' };
     return dateObj.toLocaleDateString('es-ES', options).replace('.', '');
-}
-
-function saveToStorage() {
-    localStorage.setItem('lexprop_txs', JSON.stringify(transactions));
 }
 
 function getMockTransactions() {
@@ -1424,55 +1418,52 @@ function saveFormTx() {
         return;
     }
     
-    if (txId) {
-        // Edit Mode
-        const idx = transactions.findIndex(t => t.id === txId);
-        if (idx !== -1) {
-            transactions[idx] = {
-                ...transactions[idx],
-                type,
-                category,
-                date,
-                period,
-                reference,
-                amount,
-                status,
-                notes,
-                attachment: currentAttachment // Save attachment object
-            };
-            showToast('Transacción modificada correctamente.');
-        }
-    } else {
-        // Create Mode
-        const newTx = {
-            id: 'tx-' + Date.now(),
-            type,
-            category,
-            date,
-            period,
-            reference,
-            amount,
-            status,
-            notes,
-            attachment: currentAttachment // Save attachment object
-        };
-        transactions.push(newTx);
-        showToast('Nueva transacción registrada con éxito.');
+    if (!currentUser) {
+        showToast('Debes iniciar sesión para guardar datos.', 'error');
+        return;
     }
     
-    saveToStorage();
-    closeModal();
-    updateUI();
+    const finalId = txId || ('tx-' + Date.now());
+    const txRef = doc(db, "transactions", finalId);
+    const txData = {
+        id: finalId,
+        userId: currentUser.uid,
+        profile: currentProfile,
+        type,
+        category,
+        date,
+        period,
+        reference,
+        amount,
+        status,
+        notes,
+        attachment: currentAttachment || null
+    };
+    
+    setDoc(txRef, txData)
+        .then(() => {
+            showToast(txId ? 'Transacción modificada correctamente.' : 'Nueva transacción registrada con éxito.');
+            closeModal();
+        })
+        .catch(err => {
+            showToast('Error al guardar en la nube.', 'error');
+            console.error(err);
+        });
 }
 
 window.toggleStatus = function(id) {
-    const idx = transactions.findIndex(t => t.id === id);
-    if (idx !== -1) {
-        const newStatus = transactions[idx].status === 'paid' ? 'pending' : 'paid';
-        transactions[idx].status = newStatus;
-        saveToStorage();
-        updateUI();
-        showToast(`Transacción marcada como ${newStatus === 'paid' ? 'cobrada/pagada' : 'pendiente'}.`);
+    const tx = transactions.find(t => t.id === id);
+    if (tx) {
+        const newStatus = tx.status === 'paid' ? 'pending' : 'paid';
+        const txRef = doc(db, "transactions", id);
+        setDoc(txRef, { status: newStatus }, { merge: true })
+            .then(() => {
+                showToast(`Transacción marcada como ${newStatus === 'paid' ? 'cobrada/pagada' : 'pendiente'}.`);
+            })
+            .catch(err => {
+                showToast('Error al actualizar estado en la nube.', 'error');
+                console.error(err);
+            });
     }
 };
 
@@ -1521,10 +1512,15 @@ window.editTx = function(id) {
 
 window.deleteTx = function(id) {
     if (confirm('¿Estás seguro de que deseas eliminar esta transacción? Esta acción no se puede deshacer.')) {
-        transactions = transactions.filter(t => t.id !== id);
-        saveToStorage();
-        updateUI();
-        showToast('Transacción eliminada de forma permanente.', 'info');
+        const txRef = doc(db, "transactions", id);
+        deleteDoc(txRef)
+            .then(() => {
+                showToast('Transacción eliminada de forma permanente.', 'info');
+            })
+            .catch(err => {
+                showToast('Error al eliminar de la nube.', 'error');
+                console.error(err);
+            });
     }
 };
 
@@ -1756,11 +1752,19 @@ function exportToCSV() {
 }
 
 function clearAllTransactions() {
-    if (confirm('¿Estás seguro de que deseas eliminar TODOS los datos registrados? Esta acción no se puede deshacer.')) {
-        transactions = [];
-        saveToStorage();
-        updateUI();
-        showToast('Todos los datos han sido eliminados de forma permanente.', 'info');
+    if (!currentUser) return;
+    if (confirm('¿Estás seguro de que deseas eliminar TODOS los datos registrados de este perfil? Esta acción no se puede deshacer.')) {
+        const promises = transactions.map(tx => {
+            return deleteDoc(doc(db, "transactions", tx.id));
+        });
+        Promise.all(promises)
+            .then(() => {
+                showToast('Todos los datos de este perfil han sido eliminados de la nube.', 'info');
+            })
+            .catch(err => {
+                showToast('Error al eliminar datos de la nube.', 'error');
+                console.error(err);
+            });
     }
 }
 
@@ -1784,6 +1788,7 @@ function exportToJSON() {
 }
 
 function importFromJSON(e) {
+    if (!currentUser) return;
     const file = e.target.files[0];
     if (!file) return;
     
@@ -1794,23 +1799,34 @@ function importFromJSON(e) {
             if (Array.isArray(imported)) {
                 const isValid = imported.every(tx => tx.id && tx.type && tx.amount && tx.reference);
                 if (isValid) {
-                    if (confirm(`Se importarán ${imported.length} transacciones. Esto reemplazará los datos actuales. ¿Deseas continuar?`)) {
-                        transactions = imported;
-                        saveToStorage();
-                        
-                        let needsMigration = false;
-                        transactions.forEach(tx => {
-                            if (!tx.period && tx.date) {
-                                tx.period = tx.date.substring(0, 7);
-                                needsMigration = true;
-                            }
+                    if (confirm(`Se importarán ${imported.length} transacciones. Esto sobrescribirá o agregará los datos en la nube. ¿Deseas continuar?`)) {
+                        const promises = imported.map(tx => {
+                            const finalId = tx.id || ('tx-' + Date.now() + Math.random().toString(36).substring(2, 7));
+                            const txRef = doc(db, "transactions", finalId);
+                            return setDoc(txRef, {
+                                id: finalId,
+                                userId: currentUser.uid,
+                                profile: currentProfile,
+                                type: tx.type,
+                                category: tx.category,
+                                date: tx.date,
+                                period: tx.period || tx.date.substring(0, 7),
+                                reference: tx.reference,
+                                amount: tx.amount,
+                                status: tx.status || 'paid',
+                                notes: tx.notes || '',
+                                attachment: tx.attachment || null
+                            });
                         });
-                        if (needsMigration) {
-                            saveToStorage();
-                        }
                         
-                        updateUI();
-                        showToast('Copia de seguridad restaurada con éxito.');
+                        Promise.all(promises)
+                            .then(() => {
+                                showToast('Respaldo restaurado con éxito en la nube.');
+                            })
+                            .catch(err => {
+                                showToast('Error al importar datos en la nube.', 'error');
+                                console.error(err);
+                            });
                     }
                 } else {
                     showToast('El archivo no tiene el formato de copia de seguridad válido.', 'error');
@@ -1908,3 +1924,146 @@ function setupExportReminderControls() {
         if (e.target === elements.exportReminderModal) closeExportReminderModal();
     });
 }
+
+function setupAuthControls() {
+    // Handle Login Form Submit
+    elements.loginForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const email = elements.loginEmail.value.trim();
+        const password = elements.loginPassword;
+        
+        elements.loginErrorMsg.textContent = 'Autenticando...';
+        
+        signInWithEmailAndPassword(auth, email, password.value)
+            .then(() => {
+                showToast('¡Sesión iniciada con éxito!');
+            })
+            .catch((error) => {
+                console.error("Login error:", error);
+                let message = 'Correo o contraseña incorrectos.';
+                if (error.code === 'auth/invalid-credential') {
+                    message = 'Credenciales inválidas. Por favor intenta de nuevo.';
+                } else if (error.code === 'auth/user-not-found') {
+                    message = 'Usuario no registrado.';
+                } else if (error.code === 'auth/wrong-password') {
+                    message = 'Contraseña incorrecta.';
+                }
+                elements.loginErrorMsg.textContent = message;
+            });
+    });
+    
+    // Handle Logout Click
+    elements.btnLogout.addEventListener('click', (e) => {
+        e.preventDefault();
+        signOut(auth)
+            .then(() => {
+                showToast('Sesión cerrada correctamente.', 'info');
+            })
+            .catch((error) => {
+                showToast('Error al cerrar sesión.', 'error');
+            });
+    });
+    
+    // Handle Profile Switcher Buttons Click
+    elements.profileSwitchEmpresa.addEventListener('click', () => switchProfile('empresa'));
+    elements.profileSwitchPersonal.addEventListener('click', () => switchProfile('personal'));
+}
+
+function switchProfile(profile) {
+    if (currentProfile === profile) return;
+    currentProfile = profile;
+    localStorage.setItem('cs_finanzas_current_profile', profile);
+    
+    setActiveProfileUI(profile);
+    
+    // Re-subscribe to Firestore with the new profile!
+    subscribeToTransactions();
+}
+
+function setActiveProfileUI(profile) {
+    if (profile === 'empresa') {
+        elements.profileSwitchEmpresa.classList.add('active');
+        elements.profileSwitchPersonal.classList.remove('active');
+        document.body.classList.remove('personal-theme');
+        
+        elements.currentTitle.textContent = 'Panel de Control - Empresa';
+        elements.currentSubtitle.textContent = 'Bienvenido, aquí está el resumen financiero de la oficina.';
+    } else {
+        elements.profileSwitchPersonal.classList.add('active');
+        elements.profileSwitchEmpresa.classList.remove('active');
+        document.body.classList.add('personal-theme');
+        
+        elements.currentTitle.textContent = 'Panel de Control - Personal';
+        elements.currentSubtitle.textContent = 'Aquí está el resumen de tus finanzas personales.';
+    }
+}
+
+function subscribeToTransactions() {
+    if (!currentUser) return;
+    
+    // Clean up old listener
+    if (unsubscribeTransactions) {
+        unsubscribeTransactions();
+    }
+    
+    // We query where userId == currentUser.uid AND profile == currentProfile
+    const q = query(
+        collection(db, "transactions"),
+        where("userId", "==", currentUser.uid),
+        where("profile", "==", currentProfile)
+    );
+    
+    unsubscribeTransactions = onSnapshot(q, (snapshot) => {
+        transactions = [];
+        snapshot.forEach((docSnap) => {
+            transactions.push(docSnap.data());
+        });
+        
+        // Sort transactions by date descending
+        transactions.sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
+        
+        updateUI();
+    }, (error) => {
+        console.error("Error listening to transactions: ", error);
+        showToast("Error al sincronizar datos.", "error");
+    });
+}
+
+// Global Auth State Observer
+onAuthStateChanged(auth, (user) => {
+    if (user) {
+        currentUser = user;
+        elements.loginOverlay.classList.remove('active');
+        elements.loginErrorMsg.textContent = '';
+        elements.loginForm.reset();
+        
+        // Update user display
+        elements.userDisplayEmail.textContent = user.email;
+        const initials = user.email.substring(0, 2).toUpperCase();
+        elements.userAvatarInitials.textContent = initials;
+        
+        const savedProfile = localStorage.getItem('cs_finanzas_current_profile');
+        if (savedProfile) {
+            currentProfile = savedProfile;
+        } else {
+            currentProfile = 'empresa';
+        }
+        
+        setActiveProfileUI(currentProfile);
+        
+        // Start listening to transactions in Firestore
+        subscribeToTransactions();
+    } else {
+        currentUser = null;
+        if (unsubscribeTransactions) {
+            unsubscribeTransactions();
+            unsubscribeTransactions = null;
+        }
+        transactions = [];
+        updateUI();
+        
+        elements.loginOverlay.classList.add('active');
+        elements.userDisplayEmail.textContent = 'No conectado';
+        elements.userAvatarInitials.textContent = '?';
+    }
+});
