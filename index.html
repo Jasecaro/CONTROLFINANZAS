@@ -543,6 +543,41 @@
         </div>
     </div>
 
+    <!-- MODAL: EXPORT REMINDER & SHARING -->
+    <div class="modal-overlay" id="export-reminder-modal">
+        <div class="modal-card reminder-card-wrapper">
+            <div class="modal-header">
+                <h3>¡Datos Exportados! 💾</h3>
+                <button class="btn-close" id="btn-close-reminder">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            <div class="modal-body reminder-body">
+                <div class="reminder-icon-animation">
+                    <i data-lucide="mail" class="reminder-large-icon"></i>
+                </div>
+                <h4 class="reminder-title">El archivo se ha descargado a tu dispositivo</h4>
+                <p class="reminder-text">
+                    Si planeas enviarte este respaldo por correo electrónico, <strong class="warning-highlight">¡recuerda adjuntar el archivo!</strong> Evita enviar correos vacíos. 😉
+                </p>
+                
+                <div class="reminder-actions">
+                    <button class="btn btn-primary btn-reminder-action" id="btn-reminder-email">
+                        <i data-lucide="mail"></i>
+                        <span>Redactar Correo Rápido</span>
+                    </button>
+                    <button class="btn btn-secondary btn-reminder-action" id="btn-reminder-copy">
+                        <i data-lucide="copy"></i>
+                        <span>Copiar al Portapapeles</span>
+                    </button>
+                </div>
+            </div>
+            <div class="modal-footer reminder-footer">
+                <button class="btn btn-secondary" id="btn-close-reminder-foot">Entendido</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Notification Toast -->
     <div class="toast" id="app-toast">
         <div class="toast-content">

@@ -1251,6 +1251,97 @@ body {
     max-width: 80%;
 }
 
+/* Export Reminder Modal Styling */
+.reminder-card-wrapper {
+    max-width: 460px;
+}
+
+.reminder-body {
+    padding: 24px 30px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.reminder-icon-animation {
+    width: 72px;
+    height: 72px;
+    background: rgba(245, 158, 11, 0.1);
+    border: 1px solid rgba(245, 158, 11, 0.2);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 20px;
+    color: var(--color-warning);
+    animation: pulseWarning 2s infinite ease-in-out;
+}
+
+.reminder-large-icon {
+    width: 32px;
+    height: 32px;
+}
+
+.reminder-title {
+    font-size: 1.15rem;
+    font-weight: 700;
+    margin-bottom: 12px;
+    color: var(--color-text-light);
+}
+
+.reminder-text {
+    font-size: 0.9rem;
+    color: var(--color-text-muted);
+    line-height: 1.6;
+    margin-bottom: 24px;
+}
+
+.warning-highlight {
+    color: var(--color-warning);
+    font-weight: 700;
+}
+
+.reminder-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    width: 100%;
+}
+
+.btn-reminder-action {
+    width: 100%;
+    justify-content: center;
+    padding: 14px;
+    font-size: 0.9rem;
+}
+
+.reminder-footer {
+    margin-top: 0;
+    padding: 16px 30px 24px 30px;
+    border-top: none;
+}
+
+.reminder-footer .btn {
+    width: 100%;
+    justify-content: center;
+}
+
+@keyframes pulseWarning {
+    0% {
+        transform: scale(1);
+        box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.2);
+    }
+    70% {
+        transform: scale(1.05);
+        box-shadow: 0 0 0 10px rgba(245, 158, 11, 0);
+    }
+    100% {
+        transform: scale(1);
+        box-shadow: 0 0 0 0 rgba(245, 158, 11, 0);
+    }
+}
+
 /* Voucher Card Styling */
 .voucher-card-wrapper {
     max-width: 480px;

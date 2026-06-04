@@ -28,6 +28,7 @@ const CATEGORIES = {
 let transactions = [];
 let charts = {};
 let currentAttachment = null; // Local state for file uploads
+let lastExportedData = null; // Stores last export content for sharing
 
 // DOM Elements
 const elements = {
@@ -111,7 +112,14 @@ const elements = {
     
     // Toast
     toast: document.getElementById('app-toast'),
-    toastMsg: document.querySelector('.toast-message')
+    toastMsg: document.querySelector('.toast-message'),
+
+    // Export Reminder Modal
+    exportReminderModal: document.getElementById('export-reminder-modal'),
+    btnCloseReminder: document.getElementById('btn-close-reminder'),
+    btnCloseReminderFoot: document.getElementById('btn-close-reminder-foot'),
+    btnReminderEmail: document.getElementById('btn-reminder-email'),
+    btnReminderCopy: document.getElementById('btn-reminder-copy')
 };
 
 // --- 2. INITIALIZATION & STORAGE ---
@@ -139,6 +147,9 @@ function initApp() {
     
     // Setup Filter Listeners
     setupFilters();
+    
+    // Setup Export Reminder Modal Controls
+    setupExportReminderControls();
     
     // Initial Render of everything
     updateUI();
@@ -1730,15 +1741,17 @@ function exportToCSV() {
         csvContent += row + "\r\n";
     });
     
+    const filename = `Caro_Sebastiani_Finanzas_Export_${new Date().toISOString().substring(0,10)}.csv`;
     const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.setAttribute("href", url);
-    link.setAttribute("download", `Caro_Sebastiani_Finanzas_Export_${new Date().toISOString().substring(0,10)}.csv`);
+    link.setAttribute("download", filename);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    showToast('Archivo CSV generado y descargado.');
+    
+    openExportReminderModal('csv', csvContent, filename);
 }
 
 function clearAllTransactions() {
@@ -1756,15 +1769,17 @@ function exportToJSON() {
         return;
     }
     const dataStr = JSON.stringify(transactions, null, 2);
+    const filename = `CS_Finanzas_Backup_${new Date().toISOString().substring(0,10)}.json`;
     const blob = new Blob([dataStr], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.setAttribute("href", url);
-    link.setAttribute("download", `CS_Finanzas_Backup_${new Date().toISOString().substring(0,10)}.json`);
+    link.setAttribute("download", filename);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    showToast('Copia de seguridad descargada con éxito.');
+    
+    openExportReminderModal('json', dataStr, filename);
 }
 
 function importFromJSON(e) {
@@ -1841,4 +1856,54 @@ function showToast(message, type = 'success') {
     toastTimeout = setTimeout(() => {
         elements.toast.classList.remove('active');
     }, 3500);
+}
+
+// --- 11. EXPORT REMINDER MODAL LOGIC ---
+function openExportReminderModal(type, content, filename) {
+    lastExportedData = { type, content, filename };
+    elements.exportReminderModal.classList.add('active');
+}
+
+function closeExportReminderModal() {
+    elements.exportReminderModal.classList.remove('active');
+    lastExportedData = null;
+}
+
+function handleReminderEmail() {
+    if (!lastExportedData) return;
+    
+    const subject = encodeURIComponent(`Respaldo de Finanzas - Caro & Sebastiani (${lastExportedData.type.toUpperCase()})`);
+    const body = encodeURIComponent(
+        `Hola,\n\n` +
+        `Adjunto el archivo de respaldo de finanzas "${lastExportedData.filename}" generado el día de hoy.\n\n` +
+        `⚠️ [RECUERDA ADJUNTAR EL ARCHIVO DESCARGADO ANTES DE ENVIAR ESTE CORREO] 📎\n\n` +
+        `Saludos,\n` +
+        `Control de Finanzas`
+    );
+    
+    window.location.href = `mailto:?subject=${subject}&body=${body}`;
+    closeExportReminderModal();
+}
+
+function handleReminderCopy() {
+    if (!lastExportedData) return;
+    
+    navigator.clipboard.writeText(lastExportedData.content)
+        .then(() => {
+            showToast('¡Datos copiados al portapapeles! 📋');
+            closeExportReminderModal();
+        })
+        .catch(err => {
+            showToast('Error al copiar al portapapeles.', 'error');
+        });
+}
+
+function setupExportReminderControls() {
+    elements.btnCloseReminder.addEventListener('click', closeExportReminderModal);
+    elements.btnCloseReminderFoot.addEventListener('click', closeExportReminderModal);
+    elements.btnReminderEmail.addEventListener('click', handleReminderEmail);
+    elements.btnReminderCopy.addEventListener('click', handleReminderCopy);
+    elements.exportReminderModal.addEventListener('click', (e) => {
+        if (e.target === elements.exportReminderModal) closeExportReminderModal();
+    });
 }
