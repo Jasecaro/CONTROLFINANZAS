@@ -58,7 +58,7 @@ let lastExportedData = null; // Stores last export content for sharing
 // DOM Elements
 const elements = {
     // Nav & Views
-    navBtns: document.querySelectorAll('.nav-btn'),
+    navBtns: document.querySelectorAll('.nav-btn, .mobile-nav-btn[data-view]'),
     views: document.querySelectorAll('.app-view'),
     currentTitle: document.getElementById('page-current-title'),
     currentSubtitle: document.getElementById('header-current-subtitle'),
@@ -156,7 +156,19 @@ const elements = {
     userAvatarInitials: document.getElementById('user-avatar-initials'),
     btnLogout: document.getElementById('btn-logout'),
     profileSwitchEmpresa: document.getElementById('profile-switch-empresa'),
-    profileSwitchPersonal: document.getElementById('profile-switch-personal')
+    profileSwitchPersonal: document.getElementById('profile-switch-personal'),
+
+    // Mobile Navigation & Drawer Elements
+    btnMobileAdd: document.getElementById('btn-mobile-add'),
+    btnMenuToggle: document.getElementById('mobile-nav-menu-toggle'),
+    mobileDrawer: document.getElementById('mobile-drawer'),
+    btnCloseDrawer: document.getElementById('btn-close-drawer'),
+    mobileDrawerOverlay: document.getElementById('mobile-drawer-overlay'),
+    drawerSwitchEmpresa: document.getElementById('drawer-switch-empresa'),
+    drawerSwitchPersonal: document.getElementById('drawer-switch-personal'),
+    drawerUserEmail: document.getElementById('drawer-user-email'),
+    drawerAvatarInitials: document.getElementById('drawer-avatar-initials'),
+    btnDrawerLogout: document.getElementById('btn-drawer-logout')
 };
 
 // --- 2. INITIALIZATION & STORAGE ---
@@ -182,6 +194,9 @@ function initApp() {
     
     // Setup Export Reminder Modal Controls
     setupExportReminderControls();
+    
+    // Setup Mobile Navigation & Drawer Controls
+    setupMobileControls();
     
     // Initial Render of everything
     updateUI();
@@ -1984,6 +1999,8 @@ function setActiveProfileUI(profile) {
     if (profile === 'empresa') {
         elements.profileSwitchEmpresa.classList.add('active');
         elements.profileSwitchPersonal.classList.remove('active');
+        elements.drawerSwitchEmpresa.classList.add('active');
+        elements.drawerSwitchPersonal.classList.remove('active');
         document.body.classList.remove('personal-theme');
         
         elements.currentTitle.textContent = 'Panel de Control - Empresa';
@@ -1991,6 +2008,8 @@ function setActiveProfileUI(profile) {
     } else {
         elements.profileSwitchPersonal.classList.add('active');
         elements.profileSwitchEmpresa.classList.remove('active');
+        elements.drawerSwitchPersonal.classList.add('active');
+        elements.drawerSwitchEmpresa.classList.remove('active');
         document.body.classList.add('personal-theme');
         
         elements.currentTitle.textContent = 'Panel de Control - Personal';
@@ -2039,8 +2058,10 @@ onAuthStateChanged(auth, (user) => {
         
         // Update user display
         elements.userDisplayEmail.textContent = user.email;
+        elements.drawerUserEmail.textContent = user.email;
         const initials = user.email.substring(0, 2).toUpperCase();
         elements.userAvatarInitials.textContent = initials;
+        elements.drawerAvatarInitials.textContent = initials;
         
         const savedProfile = localStorage.getItem('cs_finanzas_current_profile');
         if (savedProfile) {
@@ -2064,6 +2085,53 @@ onAuthStateChanged(auth, (user) => {
         
         elements.loginOverlay.classList.add('active');
         elements.userDisplayEmail.textContent = 'No conectado';
+        elements.drawerUserEmail.textContent = 'No conectado';
         elements.userAvatarInitials.textContent = '?';
+        elements.drawerAvatarInitials.textContent = '?';
     }
 });
+
+function setupMobileControls() {
+    const openDrawer = () => {
+        elements.mobileDrawer.classList.add('active');
+    };
+    
+    const closeDrawer = () => {
+        elements.mobileDrawer.classList.remove('active');
+    };
+    
+    // Toggle menu button opens drawer
+    elements.btnMenuToggle.addEventListener('click', openDrawer);
+    
+    // Close button and overlay close drawer
+    elements.btnCloseDrawer.addEventListener('click', closeDrawer);
+    elements.mobileDrawerOverlay.addEventListener('click', closeDrawer);
+    
+    // Floating Add button on mobile opens transaction modal
+    elements.btnMobileAdd.addEventListener('click', () => {
+        openModal(false);
+    });
+    
+    // Profile Switchers inside Drawer
+    elements.drawerSwitchEmpresa.addEventListener('click', () => {
+        switchProfile('empresa');
+        closeDrawer();
+    });
+    elements.drawerSwitchPersonal.addEventListener('click', () => {
+        switchProfile('personal');
+        closeDrawer();
+    });
+    
+    // Drawer Logout button
+    elements.btnDrawerLogout.addEventListener('click', (e) => {
+        e.preventDefault();
+        signOut(auth)
+            .then(() => {
+                showToast('Sesión cerrada correctamente.', 'info');
+                closeDrawer();
+            })
+            .catch((error) => {
+                showToast('Error al cerrar sesión.', 'error');
+            });
+    });
+}
