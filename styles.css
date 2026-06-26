@@ -2217,4 +2217,19 @@ body.personal-theme {
     color: var(--color-expense);
 }
 
+/* ================= TEMAS DE MARCA DINÁMICOS ================= */
+body.theme-penal {
+    --color-primary: #3b82f6;          /* Azul brillante original de Penal */
+    --color-primary-hover: #2563eb;
+    --color-primary-gradient: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+    --shadow-button: 0 4px 12px rgba(59, 130, 246, 0.25);
+}
+
+body.theme-laboral {
+    --color-primary: #6366f1;          /* Indigo original de Finanzas */
+    --color-primary-hover: #4f46e5;
+    --color-primary-gradient: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+    --shadow-button: 0 4px 12px rgba(99, 102, 241, 0.25);
+}
+
 

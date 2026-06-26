@@ -12,7 +12,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- Lucide Icons CDN -->
     <script src="https://unpkg.com/lucide@latest"></script>
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="styles.css?v=2">
 </head>
 <body class="dark-theme">
     <div class="app-container">
@@ -24,8 +24,8 @@
                         <i data-lucide="scale"></i>
                     </div>
                     <div class="logo-text">
-                        <span class="logo-title">Caro & Sebastiani</span>
-                        <span class="logo-subtitle">Finanzas</span>
+                        <span class="logo-title" id="sidebar-logo-title">Caro & Sebastiani</span>
+                        <span class="logo-subtitle" id="sidebar-logo-subtitle">Finanzas</span>
                     </div>
                 </div>
             </div>
@@ -612,8 +612,8 @@
                 <div class="logo-icon-login">
                     <i data-lucide="scale"></i>
                 </div>
-                <h3>Caro & Sebastiani</h3>
-                <p>Control de Finanzas</p>
+                <h3 id="login-logo-title">Control de Finanzas</h3>
+                <p id="login-logo-subtitle">Ingrese sus credenciales para acceder</p>
             </div>
             <form id="login-form" class="login-form">
                 <div class="form-group-login">
@@ -698,6 +698,6 @@
     </div>
 
     <!-- Main JavaScript Logic -->
-    <script type="module" src="app.js"></script>
+    <script type="module" src="app.js?v=2"></script>
 </body>
 </html>

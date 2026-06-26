@@ -4,7 +4,7 @@
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-import { getFirestore, collection, doc, setDoc, deleteDoc, query, where, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { getFirestore, collection, doc, getDoc, setDoc, deleteDoc, query, where, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
 // Firebase Configuration
 const firebaseConfig = {
@@ -2114,14 +2114,102 @@ function subscribeToTransactions() {
     });
 }
 
+// Global Auth State Observer and Branding Manager
+async function applyUserBranding(user) {
+    const loginLogoTitle = document.getElementById('login-logo-title');
+    const loginLogoSubtitle = document.getElementById('login-logo-subtitle');
+    const sidebarLogoTitle = document.getElementById('sidebar-logo-title');
+    const sidebarLogoSubtitle = document.getElementById('sidebar-logo-subtitle');
+
+    let officeName = "Caro & Sebastiani";
+    let specialty = "Finanzas";
+    let themeClass = "theme-laboral";
+    let tabTitle = "Caro & Sebastiani Finanzas | Control de Finanzas de Abogados & Corretaje";
+
+    if (user) {
+        try {
+            // 1. Intentar obtener de Firestore
+            const profileDocRef = doc(db, "users", user.uid, "settings", "profile");
+            const profileSnap = await getDoc(profileDocRef);
+            
+            if (profileSnap.exists()) {
+                const profileData = profileSnap.data();
+                officeName = profileData.officeName || officeName;
+                specialty = profileData.specialty || specialty;
+                themeClass = profileData.themeClass || themeClass;
+                tabTitle = `${officeName} Finanzas | Control de Finanzas`;
+            } else {
+                // 2. Si no existe, auto-provisionar según correo
+                const emailLower = user.email.toLowerCase();
+                if (emailLower === "defensa@abogadossanbernardo.cl") {
+                    officeName = "Sebastiani & Puga";
+                    specialty = "Finanzas";
+                    themeClass = "theme-penal";
+                } else {
+                    officeName = "Caro & Sebastiani";
+                    specialty = "Finanzas";
+                    themeClass = "theme-laboral";
+                }
+                tabTitle = `${officeName} Finanzas | Control de Finanzas`;
+
+                // 3. Guardar en Firestore
+                await setDoc(profileDocRef, {
+                    officeName: officeName,
+                    specialty: specialty,
+                    themeClass: themeClass,
+                    createdAt: new Date().toISOString()
+                });
+                console.log("Perfil de marca de finanzas auto-provisionado en Firestore para:", user.email);
+            }
+        } catch (err) {
+            console.error("Error al cargar marca de finanzas:", err);
+            // Fallback local
+            const emailLower = (user.email || "").toLowerCase();
+            if (emailLower === "defensa@abogadossanbernardo.cl") {
+                officeName = "Sebastiani & Puga";
+                specialty = "Finanzas";
+                themeClass = "theme-penal";
+            }
+            tabTitle = `${officeName} Finanzas | Control de Finanzas`;
+        }
+    } else {
+        // Neutro al cerrar sesión
+        if (loginLogoTitle) loginLogoTitle.textContent = "Control de Finanzas";
+        if (loginLogoSubtitle) loginLogoSubtitle.textContent = "Ingrese sus credenciales para acceder";
+        
+        if (sidebarLogoTitle) sidebarLogoTitle.textContent = "Caro & Sebastiani";
+        if (sidebarLogoSubtitle) sidebarLogoSubtitle.textContent = "Finanzas";
+        
+        document.body.className = "dark-theme"; // Clase por defecto
+        document.title = "Caro & Sebastiani Finanzas | Control de Finanzas de Abogados & Corretaje";
+        return;
+    }
+
+    // Actualizar elementos DOM
+    if (sidebarLogoTitle) sidebarLogoTitle.textContent = officeName;
+    if (sidebarLogoSubtitle) sidebarLogoSubtitle.textContent = specialty;
+    
+    if (loginLogoTitle) loginLogoTitle.textContent = officeName;
+    if (loginLogoSubtitle) loginLogoSubtitle.textContent = `Control de ${specialty}`;
+    
+    document.title = tabTitle;
+
+    // Aplicar temas
+    document.body.classList.remove('theme-penal', 'theme-laboral');
+    document.body.classList.add(themeClass);
+}
+
 // Global Auth State Observer
-onAuthStateChanged(auth, (user) => {
+onAuthStateChanged(auth, async (user) => {
     if (user) {
         currentUser = user;
         elements.loginOverlay.classList.remove('active');
         elements.loginErrorMsg.textContent = '';
         elements.loginForm.reset();
         
+        // Aplicar marca dinámica del usuario
+        await applyUserBranding(user);
+
         // Update user display
         elements.userDisplayEmail.textContent = user.email;
         elements.drawerUserEmail.textContent = user.email;
@@ -2149,6 +2237,9 @@ onAuthStateChanged(auth, (user) => {
         transactions = [];
         updateUI();
         
+        // Limpiar marca dinámica
+        await applyUserBranding(null);
+
         elements.loginOverlay.classList.add('active');
         elements.userDisplayEmail.textContent = 'No conectado';
         elements.drawerUserEmail.textContent = 'No conectado';
