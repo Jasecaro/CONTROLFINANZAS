@@ -651,6 +651,26 @@
                 <p class="login-error-msg" id="login-error-msg"></p>
             </form>
         </div>
+    <!-- MODAL: REPORTES IMPRIMIBLES / PDF -->
+    <div class="modal-overlay" id="reports-pdf-modal">
+        <div class="modal-card" style="max-width: 920px; width: 95%;">
+            <div class="modal-header">
+                <h3><i data-lucide="file-text" style="vertical-align: middle; margin-right: 6px; color: var(--color-primary);"></i> Vista Previa de Reporte Financiero (PDF)</h3>
+                <button class="btn-close" id="btn-close-reports-pdf">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            <div class="modal-body" id="reports-pdf-printable-area" style="max-height: 72vh; overflow-y: auto; padding: 24px; background: #ffffff; color: #1e293b; border-radius: 12px; font-family: 'Plus Jakarta Sans', Arial, sans-serif;">
+                <!-- Populated dynamically via JS -->
+            </div>
+            <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 10px; padding-top: 16px; border-top: 1px solid var(--border-color);">
+                <button class="btn btn-secondary" id="btn-close-reports-pdf-foot">Cerrar</button>
+                <button class="btn btn-primary" id="btn-do-print-pdf">
+                    <i data-lucide="printer"></i>
+                    <span>Imprimir / Guardar en PDF</span>
+                </button>
+            </div>
+        </div>
     </div>
 
     <!-- MOBILE BOTTOM NAVIGATION -->

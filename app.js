@@ -103,6 +103,13 @@ const elements = {
     btnImportJson: document.getElementById('btn-import-json'),
     inputImportJson: document.getElementById('input-import-json'),
     
+    // PDF Report Modal Elements
+    reportsPdfModal: document.getElementById('reports-pdf-modal'),
+    reportsPdfPrintableArea: document.getElementById('reports-pdf-printable-area'),
+    btnCloseReportsPdf: document.getElementById('btn-close-reports-pdf'),
+    btnCloseReportsPdfFoot: document.getElementById('btn-close-reports-pdf-foot'),
+    btnDoPrintPdf: document.getElementById('btn-do-print-pdf'),
+    
     // Reports View
     valProfitMargin: document.getElementById('val-profit-margin'),
     valPendingCollect: document.getElementById('val-pending-collect'),
@@ -1718,7 +1725,23 @@ function setupFilters() {
         elements.btnExportReportsExcel.addEventListener('click', exportToExcel);
     }
     if (elements.btnPrintReportsPdf) {
-        elements.btnPrintReportsPdf.addEventListener('click', printReportsPdf);
+        elements.btnPrintReportsPdf.addEventListener('click', openReportsPdfModal);
+    }
+    if (elements.btnCloseReportsPdf) {
+        elements.btnCloseReportsPdf.addEventListener('click', closeReportsPdfModal);
+    }
+    if (elements.btnCloseReportsPdfFoot) {
+        elements.btnCloseReportsPdfFoot.addEventListener('click', closeReportsPdfModal);
+    }
+    if (elements.btnDoPrintPdf) {
+        elements.btnDoPrintPdf.addEventListener('click', () => {
+            window.print();
+        });
+    }
+    if (elements.reportsPdfModal) {
+        elements.reportsPdfModal.addEventListener('click', (e) => {
+            if (e.target === elements.reportsPdfModal) closeReportsPdfModal();
+        });
     }
     if (elements.btnClearAll) {
         elements.btnClearAll.addEventListener('click', clearAllTransactions);
@@ -1943,19 +1966,38 @@ function exportToCSV() {
     openExportReminderModal('csv', csvContent, filename);
 }
 
-function exportToExcel() {
-    if (typeof XLSX === 'undefined') {
-        showToast('La biblioteca para exportar a Excel no se ha cargado aún.', 'error');
-        return;
-    }
+// --- PDF EXECUTIVE REPORT GENERATOR ---
+function openReportsPdfModal() {
     if (transactions.length === 0) {
-        showToast('No hay transacciones registradas para exportar.', 'error');
+        showToast('No hay transacciones registradas para generar el reporte.', 'error');
         return;
     }
-    
-    const wb = XLSX.utils.book_new();
 
-    // --- HOJA 1: Resumen Mensual Consolidado ---
+    const todayStr = new Date().toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' });
+    const profileLabel = currentProfile === 'empresa' ? 'Empresa / Oficina' : 'Personal';
+    const officeName = (document.getElementById('sidebar-logo-title') || {}).textContent || "Caro & Sebastiani";
+
+    let totalIncome = 0;
+    let totalExpenses = 0;
+    let pendingIncome = 0;
+    let pendingCount = 0;
+
+    transactions.forEach(tx => {
+        const amt = Number(tx.amount);
+        if (tx.type === 'income') {
+            totalIncome += amt;
+            if (tx.status === 'pending') {
+                pendingIncome += amt;
+                pendingCount++;
+            }
+        } else if (tx.type === 'expense') {
+            totalExpenses += amt;
+        }
+    });
+
+    const netResult = totalIncome - totalExpenses;
+    const margin = totalIncome > 0 ? ((netResult / totalIncome) * 100).toFixed(1) : '0';
+
     const monthlySummary = {};
     transactions.forEach(tx => {
         const monthKey = tx.period;
@@ -1968,6 +2010,191 @@ function exportToExcel() {
             else monthlySummary[monthKey].brokerage += amt;
         } else if (tx.type === 'expense') {
             monthlySummary[monthKey].expenses += amt;
+        }
+    });
+
+    const sortedMonths = Object.keys(monthlySummary).sort().reverse();
+
+    const expenseTxs = transactions.filter(t => t.type === 'expense');
+    expenseTxs.sort((a, b) => {
+        if (b.period !== a.period) return b.period.localeCompare(a.period);
+        return Number(b.amount) - Number(a.amount);
+    });
+
+    let html = `
+        <div style="border-bottom: 2px solid #1e293b; padding-bottom: 16px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: flex-start;">
+            <div>
+                <h1 style="font-size: 1.5rem; font-weight: 800; color: #0f172a; margin: 0; letter-spacing: -0.5px;">${officeName}</h1>
+                <p style="font-size: 0.82rem; color: #475569; margin-top: 4px; font-weight: 600;">Informe Financiero Ejecutivo y Estado de Cuenta</p>
+            </div>
+            <div style="text-align: right; font-size: 0.78rem; color: #475569; line-height: 1.5;">
+                <p><strong>Fecha de Emisión:</strong> ${todayStr}</p>
+                <p><strong>Contexto:</strong> ${profileLabel}</p>
+            </div>
+        </div>
+
+        <!-- Metric Grid -->
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 24px;">
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px; text-align: center;">
+                <div style="font-size: 0.68rem; color: #64748b; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Margen Rentabilidad</div>
+                <div style="font-size: 1.35rem; font-weight: 800; color: ${margin >= 0 ? '#059669' : '#dc2626'}; margin-top: 4px;">${margin}%</div>
+            </div>
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px; text-align: center;">
+                <div style="font-size: 0.68rem; color: #64748b; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Ingresos Totales</div>
+                <div style="font-size: 1.35rem; font-weight: 800; color: #059669; margin-top: 4px;">${formatCurrency(totalIncome)}</div>
+            </div>
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px; text-align: center;">
+                <div style="font-size: 0.68rem; color: #64748b; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Gastos Totales</div>
+                <div style="font-size: 1.35rem; font-weight: 800; color: #dc2626; margin-top: 4px;">${formatCurrency(totalExpenses)}</div>
+            </div>
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px; text-align: center;">
+                <div style="font-size: 0.68rem; color: #64748b; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Resultado Neto</div>
+                <div style="font-size: 1.35rem; font-weight: 800; color: ${netResult >= 0 ? '#059669' : '#dc2626'}; margin-top: 4px;">${formatCurrency(netResult)}</div>
+            </div>
+        </div>
+
+        <!-- Section 1: Consolidated Monthly Table -->
+        <h3 style="font-size: 1.05rem; font-weight: 800; color: #0f172a; margin-bottom: 10px; border-bottom: 2px solid #cbd5e1; padding-bottom: 6px;">1. Resumen Mensual Consolidado</h3>
+        <table style="width: 100%; border-collapse: collapse; margin-bottom: 28px; font-size: 0.83rem;">
+            <thead>
+                <tr style="background-color: #1e293b; color: #ffffff;">
+                    <th style="padding: 10px 12px; text-align: left;">Mes / Período</th>
+                    <th style="padding: 10px 12px; text-align: right;">Ing. Judiciales</th>
+                    <th style="padding: 10px 12px; text-align: right;">Ing. Corretaje</th>
+                    <th style="padding: 10px 12px; text-align: right;">Gastos Totales</th>
+                    <th style="padding: 10px 12px; text-align: right;">Resultado Neto</th>
+                    <th style="padding: 10px 12px; text-align: center;">Margen</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+
+    sortedMonths.forEach((m, idx) => {
+        const item = monthlySummary[m];
+        const totInc = item.judicial + item.brokerage;
+        const net = totInc - item.expenses;
+        const mPct = totInc > 0 ? ((net / totInc) * 100).toFixed(0) + '%' : '0%';
+        const bg = idx % 2 === 0 ? '#ffffff' : '#f8fafc';
+
+        html += `
+            <tr style="background-color: ${bg}; border-bottom: 1px solid #e2e8f0;">
+                <td style="padding: 9px 12px; font-weight: 700; color: #0f172a;">${formatPeriodString(m)}</td>
+                <td style="padding: 9px 12px; text-align: right; color: #4338ca; font-weight: 600;">${formatCurrency(item.judicial)}</td>
+                <td style="padding: 9px 12px; text-align: right; color: #047857; font-weight: 600;">${formatCurrency(item.brokerage)}</td>
+                <td style="padding: 9px 12px; text-align: right; color: #dc2626; font-weight: 600;">${formatCurrency(item.expenses)}</td>
+                <td style="padding: 9px 12px; text-align: right; font-weight: 800; color: ${net >= 0 ? '#059669' : '#dc2626'};">${formatCurrency(net)}</td>
+                <td style="padding: 9px 12px; text-align: center; font-weight: 700; color: ${net >= 0 ? '#059669' : '#dc2626'};">${mPct}</td>
+            </tr>
+        `;
+    });
+
+    html += `
+            </tbody>
+        </table>
+
+        <!-- Section 2: Gastos Ordenados de Mayor a Menor -->
+        <h3 style="font-size: 1.05rem; font-weight: 800; color: #0f172a; margin-bottom: 10px; border-bottom: 2px solid #cbd5e1; padding-bottom: 6px;">2. Desglose de Gastos por Mes (Ordenados de Mayor a Menor Monto)</h3>
+        <table style="width: 100%; border-collapse: collapse; font-size: 0.81rem;">
+            <thead>
+                <tr style="background-color: #1e293b; color: #ffffff;">
+                    <th style="padding: 10px 12px; text-align: left;">Período</th>
+                    <th style="padding: 10px 12px; text-align: left;">Fecha</th>
+                    <th style="padding: 10px 12px; text-align: left;">Categoría</th>
+                    <th style="padding: 10px 12px; text-align: left;">Proveedor / Concepto</th>
+                    <th style="padding: 10px 12px; text-align: right;">Monto Gasto</th>
+                    <th style="padding: 10px 12px; text-align: center;">Estado</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+
+    if (expenseTxs.length === 0) {
+        html += `<tr><td colspan="6" style="text-align:center; padding:15px; color:#64748b;">No hay gastos registrados.</td></tr>`;
+    } else {
+        expenseTxs.forEach((tx, idx) => {
+            const bg = idx % 2 === 0 ? '#ffffff' : '#f8fafc';
+            html += `
+                <tr style="background-color: ${bg}; border-bottom: 1px solid #e2e8f0;">
+                    <td style="padding: 8px 12px; font-weight: 600; color: #475569;">${formatPeriodString(tx.period)}</td>
+                    <td style="padding: 8px 12px; color: #64748b;">${formatDateString(tx.date)}</td>
+                    <td style="padding: 8px 12px; font-weight: 600; color: #0f172a;">${getCategoryLabel(tx.type, tx.category)}</td>
+                    <td style="padding: 8px 12px; font-weight: 700; color: #0f172a;">${tx.reference}</td>
+                    <td style="padding: 8px 12px; text-align: right; font-weight: 800; color: #dc2626;">${formatCurrency(tx.amount)}</td>
+                    <td style="padding: 8px 12px; text-align: center;">
+                        <span style="display:inline-block; padding: 3px 8px; border-radius: 4px; font-size: 0.72rem; font-weight: 700; background: ${tx.status === 'paid' ? '#dcfce7' : '#fef3c7'}; color: ${tx.status === 'paid' ? '#15803d' : '#b45309'};">
+                            ${tx.status === 'paid' ? 'Pagado' : 'Pendiente'}
+                        </span>
+                    </td>
+                </tr>
+            `;
+        });
+    }
+
+    html += `
+            </tbody>
+        </table>
+    `;
+
+    elements.reportsPdfPrintableArea.innerHTML = html;
+    elements.reportsPdfModal.classList.add('active');
+}
+
+function closeReportsPdfModal() {
+    elements.reportsPdfModal.classList.remove('active');
+}
+
+function exportToExcel() {
+    if (typeof XLSX === 'undefined') {
+        showToast('La biblioteca para exportar a Excel no se ha cargado aún.', 'error');
+        return;
+    }
+    if (transactions.length === 0) {
+        showToast('No hay transacciones registradas para exportar.', 'error');
+        return;
+    }
+
+    const wb = XLSX.utils.book_new();
+
+    // Helper to autofit column widths so text is never truncated
+    const autofitCols = (data) => {
+        if (!data || data.length === 0) return [];
+        const keys = Object.keys(data[0]);
+        return keys.map(key => {
+            let maxLen = key.toString().length;
+            data.forEach(row => {
+                const val = row[key];
+                if (val !== null && val !== undefined) {
+                    const len = val.toString().length;
+                    if (len > maxLen) maxLen = len;
+                }
+            });
+            return { wch: Math.max(maxLen + 4, 14) };
+        });
+    };
+
+    // --- HOJA 1: Resumen Mensual Consolidado ---
+    const monthlySummary = {};
+    let totalJudicial = 0;
+    let totalBrokerage = 0;
+    let totalExpensesAll = 0;
+
+    transactions.forEach(tx => {
+        const monthKey = tx.period;
+        if (!monthlySummary[monthKey]) {
+            monthlySummary[monthKey] = { judicial: 0, brokerage: 0, expenses: 0 };
+        }
+        const amt = Number(tx.amount);
+        if (tx.type === 'income') {
+            if (tx.category.startsWith('judicial')) {
+                monthlySummary[monthKey].judicial += amt;
+                totalJudicial += amt;
+            } else {
+                monthlySummary[monthKey].brokerage += amt;
+                totalBrokerage += amt;
+            }
+        } else if (tx.type === 'expense') {
+            monthlySummary[monthKey].expenses += amt;
+            totalExpensesAll += amt;
         }
     });
 
@@ -1987,7 +2214,23 @@ function exportToExcel() {
         };
     });
 
+    // Grand Total Row
+    const grandInc = totalJudicial + totalBrokerage;
+    const grandNet = grandInc - totalExpensesAll;
+    const grandMargin = grandInc > 0 ? ((grandNet / grandInc) * 100).toFixed(1) + '%' : '0%';
+
+    summaryData.push({
+        'Período Imputación': 'TOTAL ACUMULADO HISTÓRICO',
+        'Ingresos Judiciales ($)': totalJudicial,
+        'Ingresos Corretaje ($)': totalBrokerage,
+        'Ingresos Totales ($)': grandInc,
+        'Gastos Totales ($)': totalExpensesAll,
+        'Resultado Neto ($)': grandNet,
+        'Margen de Rentabilidad': grandMargin
+    });
+
     const wsSummary = XLSX.utils.json_to_sheet(summaryData);
+    wsSummary['!cols'] = autofitCols(summaryData);
     XLSX.utils.book_append_sheet(wb, wsSummary, "Resumen Mensual");
 
     // --- HOJA 2: Gastos por Mes (Ordenados de mayor a menor gasto) ---
@@ -1998,46 +2241,40 @@ function exportToExcel() {
     });
 
     const expensesData = expenseTxs.map(tx => ({
-        'Período': formatPeriodString(tx.period),
-        'Fecha de Gasto': tx.date,
-        'Categoría': getCategoryLabel(tx.type, tx.category),
-        'Proveedor / Concepto': tx.reference,
+        'Período Imputación': formatPeriodString(tx.period),
+        'Fecha Pago/Gasto': tx.date,
+        'Categoría Gasto': getCategoryLabel(tx.type, tx.category),
+        'Proveedor / Concepto Gasto': tx.reference,
         'Monto Gasto ($)': Number(tx.amount),
-        'Estado': tx.status === 'paid' ? 'Pagado' : 'Pendiente',
-        'Notas': tx.notes || ''
+        'Estado de Pago': tx.status === 'paid' ? 'Pagado' : 'Pendiente',
+        'Notas / Observaciones': tx.notes || ''
     }));
 
     const wsExpenses = XLSX.utils.json_to_sheet(expensesData);
+    wsExpenses['!cols'] = autofitCols(expensesData);
     XLSX.utils.book_append_sheet(wb, wsExpenses, "Gastos Ordenados por Mes");
 
-    // --- HOJA 3: Historial Completo ---
+    // --- HOJA 3: Historial Completo de Transacciones ---
     const allData = transactions.map(tx => ({
         'ID Transacción': tx.id,
-        'Fecha': tx.date,
-        'Período': formatPeriodString(tx.period),
-        'Tipo': tx.type === 'income' ? 'Ingreso' : 'Gasto',
-        'Categoría': getCategoryLabel(tx.type, tx.category),
+        'Fecha Imputación': tx.date,
+        'Período Contable': formatPeriodString(tx.period),
+        'Tipo Operación': tx.type === 'income' ? 'Ingreso' : 'Gasto',
+        'Categoría Detallada': getCategoryLabel(tx.type, tx.category),
         'Cliente / Proveedor / Concepto': tx.reference,
-        'Monto ($)': Number(tx.amount),
-        'Estado': tx.status === 'paid' ? 'Cobrado/Pagado' : 'Pendiente',
-        'Notas': tx.notes || ''
+        'Monto Operación ($)': Number(tx.amount),
+        'Estado Transacción': tx.status === 'paid' ? 'Cobrado / Pagado' : 'Pendiente',
+        'Notas / Observaciones': tx.notes || ''
     }));
 
     const wsAll = XLSX.utils.json_to_sheet(allData);
+    wsAll['!cols'] = autofitCols(allData);
     XLSX.utils.book_append_sheet(wb, wsAll, "Historial Completo");
 
     const filename = `Caro_Sebastiani_Finanzas_${new Date().toISOString().substring(0,10)}.xlsx`;
     XLSX.writeFile(wb, filename);
 
-    showToast('¡Reporte en Excel (.xlsx) exportado con éxito!');
-}
-
-function printReportsPdf() {
-    document.body.classList.add('printing-reports');
-    window.print();
-    setTimeout(() => {
-        document.body.classList.remove('printing-reports');
-    }, 1000);
+    showToast('¡Reporte en Excel (.xlsx) exportado con columnas justificadas y totales!');
 }
 
 function clearAllTransactions() {
