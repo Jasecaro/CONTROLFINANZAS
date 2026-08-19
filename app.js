@@ -2159,17 +2159,29 @@ function closeReportsPdfModal() {
 
 // --- 12. CARGA MASIVA DE GASTOS (BATCH EXPENSE LOADER) ---
 function openBatchExpensesModal() {
+    const modal = document.getElementById('batch-expenses-modal');
+    if (!modal) {
+        console.error("Modal batch-expenses-modal no encontrado en el DOM.");
+        return;
+    }
     const today = new Date();
     const currentPeriod = today.toISOString().substring(0, 7);
-    elements.batchMonthInput.value = currentPeriod;
+    const monthInput = document.getElementById('batch-month-input');
+    if (monthInput) monthInput.value = currentPeriod;
     
     populateBatchExpensesTable(currentPeriod);
-    elements.batchExpensesModal.classList.add('active');
+    modal.classList.add('active');
 }
 
 function closeBatchExpensesModal() {
-    elements.batchExpensesModal.classList.remove('active');
+    const modal = document.getElementById('batch-expenses-modal');
+    if (modal) modal.classList.remove('active');
 }
+
+window.openBatchExpensesModal = openBatchExpensesModal;
+window.closeBatchExpensesModal = closeBatchExpensesModal;
+window.openModal = openModal;
+window.closeModal = closeModal;
 
 function getCategorySelectHtml(selectedVal = 'expense-rent') {
     let html = '';
@@ -2216,7 +2228,9 @@ function populateBatchExpensesTable(periodKey) {
     const [year, month] = periodKey.split('-');
     const defaultPaymentDate = `${year}-${month}-05`;
 
-    elements.batchExpensesTbody.innerHTML = '';
+    const tbody = document.getElementById('batch-expenses-tbody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
 
     defaultTemplateItems.forEach(item => {
         // Find last registered amount for this reference
@@ -2255,18 +2269,18 @@ function populateBatchExpensesTable(periodKey) {
             </td>
         `;
 
-        elements.batchExpensesTbody.appendChild(tr);
+        tbody.appendChild(tr);
     });
 
     // Attach live change listeners for inputs
-    const inputs = elements.batchExpensesTbody.querySelectorAll('.batch-amount-input, .batch-row-check');
+    const inputs = tbody.querySelectorAll('.batch-amount-input, .batch-row-check');
     inputs.forEach(input => {
         input.addEventListener('input', updateBatchTotalSummary);
         input.addEventListener('change', updateBatchTotalSummary);
     });
 
     // Attach row delete triggers
-    const delBtns = elements.batchExpensesTbody.querySelectorAll('.btn-remove-batch-row');
+    const delBtns = tbody.querySelectorAll('.btn-remove-batch-row');
     delBtns.forEach(btn => {
         btn.addEventListener('click', (e) => {
             btn.closest('tr').remove();
@@ -2274,17 +2288,20 @@ function populateBatchExpensesTable(periodKey) {
         });
     });
 
-    lucide.createIcons({
-        attrs: { 'data-lucide': true },
-        nameAttr: 'data-lucide',
-        nodeList: elements.batchExpensesTbody.querySelectorAll('[data-lucide]')
-    });
+    if (typeof lucide !== 'undefined' && lucide.createIcons) {
+        lucide.createIcons({
+            attrs: { 'data-lucide': true },
+            nameAttr: 'data-lucide',
+            nodeList: tbody.querySelectorAll('[data-lucide]')
+        });
+    }
 
     updateBatchTotalSummary();
 }
 
 function addBatchExpenseRow() {
-    const periodKey = elements.batchMonthInput.value || new Date().toISOString().substring(0, 7);
+    const monthInput = document.getElementById('batch-month-input');
+    const periodKey = (monthInput && monthInput.value) ? monthInput.value : new Date().toISOString().substring(0, 7);
     const [year, month] = periodKey.split('-');
     const defaultPaymentDate = `${year}-${month}-05`;
 
@@ -2320,7 +2337,9 @@ function addBatchExpenseRow() {
         </td>
     `;
 
-    elements.batchExpensesTbody.appendChild(tr);
+    const tbody = document.getElementById('batch-expenses-tbody');
+    if (!tbody) return;
+    tbody.appendChild(tr);
 
     const inputs = tr.querySelectorAll('.batch-amount-input, .batch-row-check');
     inputs.forEach(input => {
@@ -2329,21 +2348,25 @@ function addBatchExpenseRow() {
     });
 
     const delBtn = tr.querySelector('.btn-remove-batch-row');
-    delBtn.addEventListener('click', () => {
+    delBtn?.addEventListener('click', () => {
         tr.remove();
         updateBatchTotalSummary();
     });
 
-    lucide.createIcons({
-        attrs: { 'data-lucide': true },
-        nameAttr: 'data-lucide',
-        nodeList: tr.querySelectorAll('[data-lucide]')
-    });
+    if (typeof lucide !== 'undefined' && lucide.createIcons) {
+        lucide.createIcons({
+            attrs: { 'data-lucide': true },
+            nameAttr: 'data-lucide',
+            nodeList: tr.querySelectorAll('[data-lucide]')
+        });
+    }
 }
 
 function updateBatchTotalSummary() {
     let total = 0;
-    const rows = elements.batchExpensesTbody.querySelectorAll('tr');
+    const tbody = document.getElementById('batch-expenses-tbody');
+    if (!tbody) return;
+    const rows = tbody.querySelectorAll('tr');
     
     rows.forEach(tr => {
         const check = tr.querySelector('.batch-row-check');
@@ -2355,7 +2378,10 @@ function updateBatchTotalSummary() {
         }
     });
 
-    elements.batchTotalSummary.textContent = `Total Gastos Seleccionados: ${formatCurrency(total)}`;
+    const summaryLbl = document.getElementById('batch-total-summary');
+    if (summaryLbl) {
+        summaryLbl.textContent = `Total Gastos Seleccionados: ${formatCurrency(total)}`;
+    }
 }
 
 function saveBatchExpenses() {
