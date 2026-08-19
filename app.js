@@ -3098,9 +3098,265 @@ function setupMobileControls() {
     });
 }
 
+
 // Global Exports for Inline Handlers
 window.openBatchExpensesModal = openBatchExpensesModal;
 window.closeBatchExpensesModal = closeBatchExpensesModal;
 window.openModal = openModal;
 window.closeModal = closeModal;
 window.switchView = switchView;
+
+// =====================================================================
+// MÓDULO: CARGA MASIVA DE GASTOS MENSUALES
+// =====================================================================
+
+function openBatchExpensesModal() {
+    const modal = document.getElementById('batch-expenses-modal');
+    if (!modal) return;
+    
+    // Establecer mes actual como destino por defecto
+    const now = new Date();
+    const currentMonth = now.toISOString().substring(0, 7);
+    const monthInput = document.getElementById('batch-month-input');
+    if (monthInput) monthInput.value = currentMonth;
+    
+    // Mostrar el modal
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+    
+    // Reinicializar íconos Lucide para íconos nuevos
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+    
+    // Cargar la tabla con gastos del mes anterior
+    populateBatchExpensesTable(currentMonth);
+    
+    // Listener para "select all"
+    const selectAll = document.getElementById('batch-select-all');
+    if (selectAll) {
+        selectAll.onchange = () => {
+            document.querySelectorAll('.batch-row-check').forEach(cb => {
+                cb.checked = selectAll.checked;
+            });
+            updateBatchTotal();
+        };
+    }
+    
+    // Listener del mes input para recargar
+    if (monthInput) {
+        monthInput.onchange = () => populateBatchExpensesTable(monthInput.value);
+    }
+}
+
+function closeBatchExpensesModal() {
+    const modal = document.getElementById('batch-expenses-modal');
+    if (!modal) return;
+    modal.style.display = 'none';
+    document.body.style.overflow = '';
+}
+
+function populateBatchExpensesTable(targetMonth) {
+    const tbody = document.getElementById('batch-expenses-tbody');
+    if (!tbody) return;
+    
+    tbody.innerHTML = '<tr><td colspan="6" style="padding:40px; text-align:center; color:#94a3b8;">Buscando gastos anteriores...</td></tr>';
+    
+    // Buscar gastos del mes anterior al targetMonth para usar como plantilla
+    const [year, month] = targetMonth.split('-').map(Number);
+    let prevYear = year, prevMonth = month - 1;
+    if (prevMonth === 0) { prevMonth = 12; prevYear--; }
+    const prevPeriod = `${prevYear}-${String(prevMonth).padStart(2, '0')}`;
+    
+    // Filtrar gastos del mes anterior como plantilla
+    let templateExpenses = transactions.filter(t =>
+        t.type === 'expense' &&
+        t.period === prevPeriod &&
+        t.profile === currentProfile
+    );
+    
+    // Si no hay mes anterior, buscar gastos del mes más reciente
+    if (templateExpenses.length === 0) {
+        const expenseTransactions = transactions.filter(t =>
+            t.type === 'expense' && t.profile === currentProfile
+        );
+        if (expenseTransactions.length > 0) {
+            const periods = [...new Set(expenseTransactions.map(t => t.period))].sort().reverse();
+            if (periods.length > 0) {
+                templateExpenses = expenseTransactions.filter(t => t.period === periods[0]);
+            }
+        }
+    }
+    
+    if (templateExpenses.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="6" style="padding:40px; text-align:center; color:#94a3b8;">
+                    No se encontraron gastos anteriores como plantilla.<br>
+                    <span style="font-size:0.8rem;">Usa "Agregar fila" para añadir gastos manualmente.</span>
+                </td>
+            </tr>`;
+        updateBatchTotal();
+        return;
+    }
+    
+    // Calcular fecha del primer día del mes destino
+    const defaultDate = `${targetMonth}-01`;
+    
+    // Renderizar filas
+    tbody.innerHTML = '';
+    templateExpenses.forEach((tx, idx) => {
+        const row = buildBatchRow(idx, {
+            category: tx.category,
+            reference: tx.reference,
+            amount: tx.amount,
+            date: defaultDate,
+            status: tx.status || 'paid'
+        });
+        tbody.appendChild(row);
+    });
+    
+    updateBatchTotal();
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+function buildBatchRow(idx, data = {}) {
+    const tr = document.createElement('tr');
+    tr.style.cssText = 'border-bottom:1px solid rgba(255,255,255,0.05); transition:background 0.15s;';
+    tr.setAttribute('data-batch-row', idx);
+    
+    // Build category options
+    let catOptions = '';
+    const allCats = CATEGORIES['expense'] || [];
+    allCats.forEach(c => {
+        const sel = c.value === data.category ? 'selected' : '';
+        catOptions += `<option value="${c.value}" ${sel}>${c.label}</option>`;
+    });
+    
+    tr.innerHTML = `
+        <td style="padding:8px 6px; vertical-align:middle;">
+            <input type="checkbox" class="batch-row-check" checked style="cursor:pointer;" onchange="updateBatchTotal()">
+        </td>
+        <td style="padding:6px; vertical-align:middle;">
+            <select class="batch-cat" onchange="updateBatchTotal()" style="background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1); border-radius:6px; color:#e2e8f0; padding:6px 8px; font-size:0.8rem; width:100%; cursor:pointer;">
+                ${catOptions}
+            </select>
+        </td>
+        <td style="padding:6px; vertical-align:middle;">
+            <input type="text" class="batch-ref" value="${data.reference || ''}" placeholder="Detalle del gasto..." 
+                style="background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1); border-radius:6px; color:#e2e8f0; padding:6px 8px; font-size:0.8rem; width:100%; box-sizing:border-box;">
+        </td>
+        <td style="padding:6px; vertical-align:middle;">
+            <input type="number" class="batch-amount" value="${data.amount || ''}" min="0" placeholder="0" onchange="updateBatchTotal()" oninput="updateBatchTotal()"
+                style="background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1); border-radius:6px; color:#f87171; padding:6px 8px; font-size:0.85rem; width:100%; text-align:right; box-sizing:border-box;">
+        </td>
+        <td style="padding:6px; vertical-align:middle;">
+            <input type="date" class="batch-date" value="${data.date || ''}"
+                style="background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1); border-radius:6px; color:#e2e8f0; padding:6px 8px; font-size:0.8rem; width:100%; cursor:pointer; box-sizing:border-box;">
+        </td>
+        <td style="padding:6px; vertical-align:middle; text-align:center;">
+            <button onclick="this.closest('tr').remove(); updateBatchTotal();" title="Eliminar fila"
+                style="background:rgba(248,113,113,0.1); border:1px solid rgba(248,113,113,0.2); color:#f87171; border-radius:6px; padding:5px 8px; cursor:pointer; font-size:0.85rem; line-height:1;">✕</button>
+        </td>`;
+    
+    return tr;
+}
+
+window.updateBatchTotal = function() {
+    const totalEl = document.getElementById('batch-total-summary');
+    if (!totalEl) return;
+    let total = 0;
+    document.querySelectorAll('#batch-expenses-tbody tr[data-batch-row]').forEach(row => {
+        const cb = row.querySelector('.batch-row-check');
+        const amt = row.querySelector('.batch-amount');
+        if (cb && cb.checked && amt) {
+            const v = parseFloat(amt.value);
+            if (!isNaN(v)) total += v;
+        }
+    });
+    totalEl.innerHTML = `Total seleccionado: <strong style="color:#f87171;">${formatCurrency(total)}</strong>`;
+};
+
+function addBatchExpenseRow() {
+    const tbody = document.getElementById('batch-expenses-tbody');
+    if (!tbody) return;
+    
+    // Clear "no expenses" placeholder if present
+    const placeholder = tbody.querySelector('td[colspan]');
+    if (placeholder) tbody.innerHTML = '';
+    
+    const monthInput = document.getElementById('batch-month-input');
+    const targetMonth = monthInput ? monthInput.value : new Date().toISOString().substring(0, 7);
+    const defaultDate = `${targetMonth}-01`;
+    
+    const idx = tbody.querySelectorAll('tr[data-batch-row]').length;
+    const row = buildBatchRow(idx, { date: defaultDate });
+    tbody.appendChild(row);
+    
+    updateBatchTotal();
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+async function saveBatchExpenses() {
+    if (!currentUser) {
+        showToast('Debes iniciar sesión para guardar datos.', 'error');
+        return;
+    }
+    
+    const monthInput = document.getElementById('batch-month-input');
+    const targetMonth = monthInput ? monthInput.value : new Date().toISOString().substring(0, 7);
+    
+    const rows = document.querySelectorAll('#batch-expenses-tbody tr[data-batch-row]');
+    const toSave = [];
+    
+    rows.forEach(row => {
+        const cb = row.querySelector('.batch-row-check');
+        if (!cb || !cb.checked) return;
+        
+        const category = row.querySelector('.batch-cat')?.value || '';
+        const reference = row.querySelector('.batch-ref')?.value?.trim() || '';
+        const amount = parseFloat(row.querySelector('.batch-amount')?.value || '0');
+        const date = row.querySelector('.batch-date')?.value || `${targetMonth}-01`;
+        
+        if (!category || !reference || isNaN(amount) || amount <= 0) return;
+        
+        toSave.push({ category, reference, amount, date, period: targetMonth });
+    });
+    
+    if (toSave.length === 0) {
+        showToast('No hay gastos válidos seleccionados para guardar.', 'error');
+        return;
+    }
+    
+    const saveBtn = document.getElementById('btn-save-batch-expenses');
+    if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = `Guardando ${toSave.length} gastos...`; }
+    
+    try {
+        const promises = toSave.map(item => {
+            const id = 'tx-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7);
+            const txRef = doc(db, 'transactions', id);
+            return setDoc(txRef, {
+                id,
+                userId: currentUser.uid,
+                profile: currentProfile,
+                type: 'expense',
+                category: item.category,
+                date: item.date,
+                period: item.period,
+                reference: item.reference,
+                amount: item.amount,
+                status: 'paid',
+                notes: 'Carga masiva',
+                attachment: null
+            });
+        });
+        
+        await Promise.all(promises);
+        showToast(`✅ ${toSave.length} gastos guardados correctamente.`, 'success');
+        closeBatchExpensesModal();
+    } catch (err) {
+        console.error('Error guardando gastos masivos:', err);
+        showToast('Error al guardar en la nube. Intenta de nuevo.', 'error');
+    } finally {
+        if (saveBtn) { saveBtn.disabled = false; saveBtn.innerHTML = '<i data-lucide="save" style="width:16px;height:16px;"></i> Guardar Todos los Gastos'; }
+    }
+}
+
