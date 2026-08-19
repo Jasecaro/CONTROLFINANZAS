@@ -191,7 +191,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!btn) return;
         const id = btn.id;
 
-        if (id === 'btn-open-batch-expenses' || id === 'btn-open-batch-expenses-sidebar') {
+        if (id === 'btn-open-batch-expenses' || id === 'btn-open-batch-expenses-sidebar' || id === 'drawer-btn-batch-expenses') {
+            elements.mobileDrawer?.classList.remove('active');
             openBatchExpensesModal();
         } else if (id === 'btn-close-batch-modal' || id === 'btn-cancel-batch-modal') {
             closeBatchExpensesModal();
@@ -2215,28 +2216,27 @@ function openBatchExpensesModal() {
         monthInput.onchange = () => populateBatchExpensesTable(monthInput.value);
     }
     
-    // Mostrar modal
-    modal.style.display = 'flex';
-    document.body.style.overflow = 'hidden';
+    // Mostrar modal mediante clase .active
+    modal.classList.add('active');
     
     // Select all checkbox
     const selectAll = document.getElementById('batch-select-all');
     if (selectAll) {
+        selectAll.checked = true;
         selectAll.onchange = () => {
             document.querySelectorAll('.batch-row-check').forEach(cb => { cb.checked = selectAll.checked; });
             updateBatchTotalSummary();
         };
     }
     
-    populateBatchExpensesTable(currentPeriod);
-    if (typeof lucide !== 'undefined') lucide.createIcons();
+    populateBatchExpensesTable(monthInput ? monthInput.value : currentPeriod);
+    if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons();
 }
 
 function closeBatchExpensesModal() {
     const modal = document.getElementById('batch-expenses-modal');
     if (modal) {
-        modal.style.display = 'none';
-        document.body.style.overflow = '';
+        modal.classList.remove('active');
     }
 }
 
@@ -2255,7 +2255,6 @@ function getCategorySelectHtml(selectedVal = 'expense-rent') {
 }
 
 function populateBatchExpensesTable(periodKey) {
-    // Collect preset expense items + any custom expense references from past transactions
     const defaultTemplateItems = [
         { ref: 'Arriendo de Oficina', cat: 'expense-rent' },
         { ref: 'Servicio de Luz (Enel)', cat: 'expense-luz' },
@@ -2278,7 +2277,9 @@ function populateBatchExpensesTable(periodKey) {
     customRefs.forEach(ref => {
         const exists = defaultTemplateItems.some(item => item.ref.toLowerCase() === ref.toLowerCase());
         if (!exists) {
-            const pastTx = pastExpenses.find(t => t.reference.trim() === ref);
+            const pastMatching = pastExpenses.filter(t => t.reference && t.reference.toLowerCase().trim() === ref.toLowerCase());
+            pastMatching.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+            const pastTx = pastMatching[0];
             defaultTemplateItems.push({
                 ref: ref,
                 cat: pastTx ? pastTx.category : 'expense-other'
@@ -2287,7 +2288,7 @@ function populateBatchExpensesTable(periodKey) {
     });
 
     // Default payment date for the selected period
-    const [year, month] = periodKey.split('-');
+    const [year, month] = (periodKey || new Date().toISOString().substring(0, 7)).split('-');
     const defaultPaymentDate = `${year}-${month}-05`;
 
     const tbody = document.getElementById('batch-expenses-tbody');
@@ -2295,8 +2296,10 @@ function populateBatchExpensesTable(periodKey) {
     tbody.innerHTML = '';
 
     defaultTemplateItems.forEach(item => {
-        // Find last registered amount for this reference
-        const lastTx = pastExpenses.find(t => t.reference.toLowerCase().trim() === item.ref.toLowerCase().trim());
+        // Find last registered amount for this reference (most recent transaction)
+        const pastMatching = pastExpenses.filter(t => t.reference && t.reference.toLowerCase().trim() === item.ref.toLowerCase().trim());
+        pastMatching.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+        const lastTx = pastMatching[0];
         const lastAmount = lastTx ? Number(lastTx.amount) : 0;
 
         const tr = document.createElement('tr');
@@ -2344,18 +2347,14 @@ function populateBatchExpensesTable(periodKey) {
     // Attach row delete triggers
     const delBtns = tbody.querySelectorAll('.btn-remove-batch-row');
     delBtns.forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            btn.closest('tr').remove();
+        btn.addEventListener('click', () => {
+            btn.closest('tr')?.remove();
             updateBatchTotalSummary();
         });
     });
 
     if (typeof lucide !== 'undefined' && lucide.createIcons) {
-        lucide.createIcons({
-            attrs: { 'data-lucide': true },
-            nameAttr: 'data-lucide',
-            nodeList: tbody.querySelectorAll('[data-lucide]')
-        });
+        lucide.createIcons();
     }
 
     updateBatchTotalSummary();
@@ -2416,11 +2415,7 @@ function addBatchExpenseRow() {
     });
 
     if (typeof lucide !== 'undefined' && lucide.createIcons) {
-        lucide.createIcons({
-            attrs: { 'data-lucide': true },
-            nameAttr: 'data-lucide',
-            nodeList: tr.querySelectorAll('[data-lucide]')
-        });
+        lucide.createIcons();
     }
 }
 
@@ -2442,7 +2437,7 @@ function updateBatchTotalSummary() {
 
     const summaryLbl = document.getElementById('batch-total-summary');
     if (summaryLbl) {
-        summaryLbl.textContent = `Total Gastos Seleccionados: ${formatCurrency(total)}`;
+        summaryLbl.textContent = `Total Gastos: ${formatCurrency(total)}`;
     }
 }
 
@@ -2452,8 +2447,11 @@ function saveBatchExpenses() {
         return;
     }
 
-    const periodKey = elements.batchMonthInput.value || new Date().toISOString().substring(0, 7);
-    const rows = elements.batchExpensesTbody.querySelectorAll('tr');
+    const monthInput = document.getElementById('batch-month-input');
+    const periodKey = (monthInput && monthInput.value) ? monthInput.value : new Date().toISOString().substring(0, 7);
+    const tbody = document.getElementById('batch-expenses-tbody');
+    if (!tbody) return;
+    const rows = tbody.querySelectorAll('tr');
     
     const itemsToSave = [];
 
@@ -2469,7 +2467,7 @@ function saveBatchExpenses() {
             const reference = refInput ? refInput.value.trim() : '';
             const category = catSelect ? catSelect.value : 'expense-other';
             const amount = amountInput ? Math.abs(parseFloat(amountInput.value) || 0) : 0;
-            const date = dateInput ? dateInput.value : `${periodKey}-01`;
+            const date = dateInput ? dateInput.value : `${periodKey}-05`;
             const status = statusSelect ? statusSelect.value : 'paid';
 
             if (reference && amount > 0) {
@@ -2490,9 +2488,17 @@ function saveBatchExpenses() {
         return;
     }
 
-    if (confirm(`Se registrarán ${itemsToSave.length} gastos en el período ${formatPeriodString(periodKey)} por un total de ${elements.batchTotalSummary.textContent.replace('Total Gastos Seleccionados: ', '')}.\n\n¿Deseas continuar?`)) {
+    const summaryLbl = document.getElementById('batch-total-summary');
+    const totalText = summaryLbl ? summaryLbl.textContent.replace('Total Gastos: ', '') : '';
+    if (confirm(`Se registrarán ${itemsToSave.length} gastos en el período ${formatPeriodString(periodKey)} por un total de ${totalText}.\n\n¿Deseas continuar?`)) {
+        const saveBtn = document.getElementById('btn-save-batch-expenses');
+        if (saveBtn) {
+            saveBtn.disabled = true;
+            saveBtn.innerHTML = '<span>Guardando gastos...</span>';
+        }
+
         const promises = itemsToSave.map(item => {
-            const finalId = 'tx-' + Date.now() + Math.random().toString(36).substring(2, 7);
+            const finalId = 'tx-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7);
             const txRef = doc(db, "transactions", finalId);
             return setDoc(txRef, {
                 id: finalId,
@@ -2518,6 +2524,13 @@ function saveBatchExpenses() {
             .catch(err => {
                 showToast('Error al guardar gastos masivos en la nube.', 'error');
                 console.error(err);
+            })
+            .finally(() => {
+                if (saveBtn) {
+                    saveBtn.disabled = false;
+                    saveBtn.innerHTML = '<i data-lucide="check-circle"></i><span>Guardar Todos los Gastos</span>';
+                    if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons();
+                }
             });
     }
 }
@@ -3102,6 +3115,12 @@ function setupMobileControls() {
     elements.drawerSwitchPersonal?.addEventListener('click', () => {
         switchProfile('personal');
         closeDrawer();
+    });
+    
+    // Drawer Batch Expenses button
+    document.getElementById('drawer-btn-batch-expenses')?.addEventListener('click', () => {
+        closeDrawer();
+        openBatchExpensesModal();
     });
     
     // Drawer Logout button
