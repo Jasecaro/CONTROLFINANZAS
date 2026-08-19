@@ -217,39 +217,40 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function initApp() {
-    // Setup date string in header
-    setupHeaderDate();
+    try { setupHeaderDate(); } catch(e) { console.warn('setupHeaderDate error:', e); }
     
-    // Set up Authentication Controls
-    setupAuthControls();
+    // Set up Authentication Controls — siempre primero
+    try { setupAuthControls(); } catch(e) { console.error('setupAuthControls error:', e); }
     
     // Set up Navigation
-    setupNavigation();
+    try { setupNavigation(); } catch(e) { console.warn('setupNavigation error:', e); }
     
     // Set up Form Selects & Event Listeners
-    setupFormControls();
+    try { setupFormControls(); } catch(e) { console.warn('setupFormControls error:', e); }
     
     // Setup Filter Listeners
-    setupFilters();
+    try { setupFilters(); } catch(e) { console.warn('setupFilters error:', e); }
     
     // Setup Export Reminder Modal Controls
-    setupExportReminderControls();
+    try { setupExportReminderControls(); } catch(e) { console.warn('setupExportReminderControls error:', e); }
     
     // Setup Mobile Navigation & Drawer Controls
-    setupMobileControls();
+    try { setupMobileControls(); } catch(e) { console.warn('setupMobileControls error:', e); }
     
     // Initial Render of everything
-    updateUI();
+    try { updateUI(); } catch(e) { console.warn('updateUI error:', e); }
     
     // Initialize Lucide Icons
     if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
 function setupHeaderDate() {
+    const el = elements.currentDateText;
+    if (!el) return;
     const today = new Date();
     const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
     const dateFormatted = today.toLocaleDateString('es-ES', options);
-    elements.currentDateText.textContent = dateFormatted.charAt(0).toUpperCase() + dateFormatted.slice(1);
+    el.textContent = dateFormatted.charAt(0).toUpperCase() + dateFormatted.slice(1);
 }
 
 // Convert numbers to currency CL/General
