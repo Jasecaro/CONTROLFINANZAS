@@ -2737,3 +2737,12 @@ function setupMobileControls() {
             });
     });
 }
+
+// --- INITIALIZE ALL SYSTEM CONTROLS & LISTENERS ---
+setupNavigation();
+setupFormControls();
+setupFilters();
+setupExportReminderControls();
+setupAuthControls();
+setupMobileControls();
+
