@@ -810,8 +810,18 @@ function renderReportsView() {
 
 // --- 4. CHART.JS CONFIGURATIONS ---
 function renderCharts() {
+    // Only render charts if dashboard or reports view is currently active in the DOM
+    const dashboardView = document.getElementById('view-dashboard');
+    const reportsView = document.getElementById('view-reports');
+    const isDashActive = dashboardView && dashboardView.classList.contains('active');
+    const isReportsActive = reportsView && reportsView.classList.contains('active');
+    if (!isDashActive && !isReportsActive) return;
+
     Object.keys(charts).forEach(key => {
-        if (charts[key]) charts[key].destroy();
+        if (charts[key]) {
+            try { charts[key].destroy(); } catch(e) {}
+            charts[key] = null;
+        }
     });
     
     Chart.defaults.color = '#9ca3af';
@@ -3056,11 +3066,9 @@ function setupMobileControls() {
     });
 }
 
-// --- INITIALIZE ALL SYSTEM CONTROLS & LISTENERS ---
-setupNavigation();
-setupFormControls();
-setupFilters();
-setupExportReminderControls();
-setupAuthControls();
-setupMobileControls();
-
+// Global Exports for Inline Handlers
+window.openBatchExpensesModal = openBatchExpensesModal;
+window.closeBatchExpensesModal = closeBatchExpensesModal;
+window.openModal = openModal;
+window.closeModal = closeModal;
+window.switchView = switchView;
