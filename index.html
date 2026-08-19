@@ -66,6 +66,10 @@
             </nav>
 
             <div class="sidebar-footer">
+                <button class="btn btn-secondary btn-add-transaction" id="btn-open-batch-expenses-sidebar" style="background: rgba(99, 102, 241, 0.15); border: 1px solid rgba(99, 102, 241, 0.4); color: var(--color-text-light); margin-bottom: 6px;" title="Cargar todos los gastos del mes en una sola tabla">
+                    <i data-lucide="layers"></i>
+                    <span>Cargar Gastos del Mes</span>
+                </button>
                 <button class="btn btn-primary btn-add-transaction" id="btn-open-modal">
                     <i data-lucide="plus-circle"></i>
                     <span>Nueva Transacción</span>
@@ -241,13 +245,13 @@
                                 <input type="text" id="filter-search" placeholder="Buscar cliente, caso, propiedad o notas...">
                             </div>
                             <div class="action-buttons" style="display: flex; gap: 8px; flex-wrap: wrap;">
+                                <button class="btn btn-primary" id="btn-open-batch-expenses" title="Cargar todos los gastos mensuales de una sola vez en una tabla editable">
+                                    <i data-lucide="layers"></i>
+                                    <span>Cargar Gastos del Mes</span>
+                                </button>
                                 <button class="btn btn-excel" id="btn-export-excel" title="Exportar reporte ordenado a archivo Excel (.xlsx)">
                                     <i data-lucide="file-spreadsheet"></i>
                                     <span>Exportar Excel (.xlsx)</span>
-                                </button>
-                                <button class="btn btn-secondary" id="btn-clone-prev-month" title="Clonar todos los gastos del mes anterior al mes actual">
-                                    <i data-lucide="copy"></i>
-                                    <span>Clonar Gastos Mes Anterior</span>
                                 </button>
                                 <button class="btn btn-secondary" id="btn-export-csv" title="Exportar datos a CSV">
                                     <i data-lucide="download"></i>
@@ -672,6 +676,66 @@
                     <i data-lucide="printer"></i>
                     <span>Imprimir / Guardar en PDF</span>
                 </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: CARGA MASIVA DE GASTOS -->
+    <div class="modal-overlay" id="batch-expenses-modal">
+        <div class="modal-card" style="max-width: 980px; width: 95%;">
+            <div class="modal-header">
+                <h3><i data-lucide="layers" style="vertical-align: middle; margin-right: 6px; color: var(--color-primary);"></i> Carga Masiva de Gastos Mensuales</h3>
+                <button class="btn-close" id="btn-close-batch-modal">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            <div class="modal-body" style="max-height: 70vh; overflow-y: auto; padding: 20px;">
+                <p style="font-size: 0.85rem; color: var(--color-text-muted); margin-bottom: 16px;">
+                    Revisa y edita los montos y fechas de pago para registrar todos tus gastos habituales de una sola vez. Desmarca los que no apliquen este mes.
+                </p>
+                <div style="display: flex; gap: 12px; margin-bottom: 16px; align-items: center; justify-content: space-between; flex-wrap: wrap;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <label style="font-size: 0.8rem; font-weight: 700; color: var(--color-text-light);">Período de Imputación:</label>
+                        <input type="month" id="batch-month-input" class="form-select" style="padding: 6px 12px; width: auto; font-size: 0.82rem;">
+                    </div>
+                    <div style="display: flex; gap: 8px;">
+                        <button class="btn btn-secondary" id="btn-reload-batch-template" style="font-size: 0.78rem;">
+                            <i data-lucide="refresh-cw"></i> Recargar Plantilla
+                        </button>
+                        <button class="btn btn-secondary" id="btn-add-batch-row" style="font-size: 0.78rem;">
+                            <i data-lucide="plus"></i> + Agregar Fila
+                        </button>
+                    </div>
+                </div>
+
+                <div class="table-container">
+                    <table class="data-table" id="batch-expenses-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 40px; text-align: center;"><input type="checkbox" id="batch-select-all" checked title="Seleccionar todos"></th>
+                                <th style="min-width: 180px;">Proveedor / Concepto</th>
+                                <th style="min-width: 170px;">Categoría Gasto</th>
+                                <th style="width: 140px;">Monto ($)</th>
+                                <th style="width: 140px;">Fecha Pago</th>
+                                <th style="width: 120px;">Estado</th>
+                                <th style="width: 45px; text-align: center;"></th>
+                            </tr>
+                        </thead>
+                        <tbody id="batch-expenses-tbody">
+                            <!-- Populated dynamically via JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center; padding-top: 16px; border-top: 1px solid var(--border-color);">
+                <span id="batch-total-summary" style="font-size: 1rem; font-weight: 800; color: var(--color-expense);">Total Gastos: $0</span>
+                <div style="display: flex; gap: 10px;">
+                    <button class="btn btn-secondary" id="btn-cancel-batch-modal">Cancelar</button>
+                    <button class="btn btn-primary" id="btn-save-batch-expenses">
+                        <i data-lucide="check-circle"></i>
+                        <span>Guardar Todos los Gastos</span>
+                    </button>
+                </div>
             </div>
         </div>
     </div>

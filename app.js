@@ -109,6 +109,20 @@ const elements = {
     btnCloseReportsPdf: document.getElementById('btn-close-reports-pdf'),
     btnCloseReportsPdfFoot: document.getElementById('btn-close-reports-pdf-foot'),
     btnDoPrintPdf: document.getElementById('btn-do-print-pdf'),
+
+    // Batch Expenses Modal Elements
+    btnOpenBatchExpenses: document.getElementById('btn-open-batch-expenses'),
+    btnOpenBatchExpensesSidebar: document.getElementById('btn-open-batch-expenses-sidebar'),
+    batchExpensesModal: document.getElementById('batch-expenses-modal'),
+    batchMonthInput: document.getElementById('batch-month-input'),
+    batchExpensesTbody: document.getElementById('batch-expenses-tbody'),
+    batchTotalSummary: document.getElementById('batch-total-summary'),
+    batchSelectAll: document.getElementById('batch-select-all'),
+    btnReloadBatchTemplate: document.getElementById('btn-reload-batch-template'),
+    btnAddBatchRow: document.getElementById('btn-add-batch-row'),
+    btnCloseBatchModal: document.getElementById('btn-close-batch-modal'),
+    btnCancelBatchModal: document.getElementById('btn-cancel-batch-modal'),
+    btnSaveBatchExpenses: document.getElementById('btn-save-batch-expenses'),
     
     // Reports View
     valProfitMargin: document.getElementById('val-profit-margin'),
@@ -1700,11 +1714,11 @@ function setupFilters() {
         renderTransactionsTable();
     };
     
-    elements.filterSearch.addEventListener('input', triggerFilter);
-    elements.filterType.addEventListener('change', triggerFilter);
-    elements.filterCategory.addEventListener('change', triggerFilter);
-    elements.filterStatus.addEventListener('change', triggerFilter);
-    elements.filterMonth.addEventListener('change', triggerFilter);
+    if (elements.filterSearch) elements.filterSearch.addEventListener('input', triggerFilter);
+    if (elements.filterType) elements.filterType.addEventListener('change', triggerFilter);
+    if (elements.filterCategory) elements.filterCategory.addEventListener('change', triggerFilter);
+    if (elements.filterStatus) elements.filterStatus.addEventListener('change', triggerFilter);
+    if (elements.filterMonth) elements.filterMonth.addEventListener('change', triggerFilter);
     
     if (elements.dashboardPeriodSelect) {
         elements.dashboardPeriodSelect.addEventListener('change', () => {
@@ -1714,33 +1728,51 @@ function setupFilters() {
         });
     }
     
-    elements.btnExportCsv.addEventListener('click', exportToCSV);
-    if (elements.btnExportExcel) {
-        elements.btnExportExcel.addEventListener('click', exportToExcel);
-    }
-    if (elements.btnClonePrevMonth) {
-        elements.btnClonePrevMonth.addEventListener('click', duplicatePreviousMonthExpenses);
-    }
-    if (elements.btnExportReportsExcel) {
-        elements.btnExportReportsExcel.addEventListener('click', exportToExcel);
-    }
-    if (elements.btnPrintReportsPdf) {
-        elements.btnPrintReportsPdf.addEventListener('click', openReportsPdfModal);
-    }
-    if (elements.btnCloseReportsPdf) {
-        elements.btnCloseReportsPdf.addEventListener('click', closeReportsPdfModal);
-    }
-    if (elements.btnCloseReportsPdfFoot) {
-        elements.btnCloseReportsPdfFoot.addEventListener('click', closeReportsPdfModal);
-    }
-    if (elements.btnDoPrintPdf) {
-        elements.btnDoPrintPdf.addEventListener('click', () => {
-            window.print();
-        });
-    }
+    if (elements.btnExportCsv) elements.btnExportCsv.addEventListener('click', exportToCSV);
+    if (elements.btnExportExcel) elements.btnExportExcel.addEventListener('click', exportToExcel);
+    if (elements.btnExportReportsExcel) elements.btnExportReportsExcel.addEventListener('click', exportToExcel);
+    
+    if (elements.btnPrintReportsPdf) elements.btnPrintReportsPdf.addEventListener('click', openReportsPdfModal);
+    if (elements.btnCloseReportsPdf) elements.btnCloseReportsPdf.addEventListener('click', closeReportsPdfModal);
+    if (elements.btnCloseReportsPdfFoot) elements.btnCloseReportsPdfFoot.addEventListener('click', closeReportsPdfModal);
+    if (elements.btnDoPrintPdf) elements.btnDoPrintPdf.addEventListener('click', () => window.print());
     if (elements.reportsPdfModal) {
         elements.reportsPdfModal.addEventListener('click', (e) => {
             if (e.target === elements.reportsPdfModal) closeReportsPdfModal();
+        });
+    }
+
+    // --- BATCH EXPENSES MODAL EVENT LISTENERS ---
+    if (elements.btnOpenBatchExpenses) elements.btnOpenBatchExpenses.addEventListener('click', openBatchExpensesModal);
+    if (elements.btnOpenBatchExpensesSidebar) elements.btnOpenBatchExpensesSidebar.addEventListener('click', openBatchExpensesModal);
+    if (elements.btnCloseBatchModal) elements.btnCloseBatchModal.addEventListener('click', closeBatchExpensesModal);
+    if (elements.btnCancelBatchModal) elements.btnCancelBatchModal.addEventListener('click', closeBatchExpensesModal);
+    if (elements.batchExpensesModal) {
+        elements.batchExpensesModal.addEventListener('click', (e) => {
+            if (e.target === elements.batchExpensesModal) closeBatchExpensesModal();
+        });
+    }
+    if (elements.btnReloadBatchTemplate) {
+        elements.btnReloadBatchTemplate.addEventListener('click', () => {
+            const periodVal = elements.batchMonthInput.value || new Date().toISOString().substring(0, 7);
+            populateBatchExpensesTable(periodVal);
+        });
+    }
+    if (elements.btnAddBatchRow) elements.btnAddBatchRow.addEventListener('click', addBatchExpenseRow);
+    if (elements.btnSaveBatchExpenses) elements.btnSaveBatchExpenses.addEventListener('click', saveBatchExpenses);
+    if (elements.batchMonthInput) {
+        elements.batchMonthInput.addEventListener('change', (e) => {
+            if (e.target.value) {
+                populateBatchExpensesTable(e.target.value);
+            }
+        });
+    }
+    if (elements.batchSelectAll) {
+        elements.batchSelectAll.addEventListener('change', (e) => {
+            const isChecked = e.target.checked;
+            const rowChecks = elements.batchExpensesTbody.querySelectorAll('.batch-row-check');
+            rowChecks.forEach(chk => chk.checked = isChecked);
+            updateBatchTotalSummary();
         });
     }
     if (elements.btnClearAll) {
@@ -2141,6 +2173,283 @@ function openReportsPdfModal() {
 
 function closeReportsPdfModal() {
     elements.reportsPdfModal.classList.remove('active');
+}
+
+// --- 12. CARGA MASIVA DE GASTOS (BATCH EXPENSE LOADER) ---
+function openBatchExpensesModal() {
+    const today = new Date();
+    const currentPeriod = today.toISOString().substring(0, 7);
+    elements.batchMonthInput.value = currentPeriod;
+    
+    populateBatchExpensesTable(currentPeriod);
+    elements.batchExpensesModal.classList.add('active');
+}
+
+function closeBatchExpensesModal() {
+    elements.batchExpensesModal.classList.remove('active');
+}
+
+function getCategorySelectHtml(selectedVal = 'expense-rent') {
+    let html = '';
+    CATEGORIES.expense.forEach(c => {
+        const isSel = c.value === selectedVal ? 'selected' : '';
+        html += `<option value="${c.value}" ${isSel}>${c.label}</option>`;
+    });
+    return html;
+}
+
+function populateBatchExpensesTable(periodKey) {
+    // Collect preset expense items + any custom expense references from past transactions
+    const defaultTemplateItems = [
+        { ref: 'Arriendo de Oficina', cat: 'expense-rent' },
+        { ref: 'Servicio de Luz (Enel)', cat: 'expense-luz' },
+        { ref: 'Servicio de Agua (Aguas Andinas)', cat: 'expense-agua' },
+        { ref: 'Internet & Telecomunicaciones (VTR)', cat: 'expense-internet' },
+        { ref: 'Suministros e Imprenta', cat: 'expense-supplies' },
+        { ref: 'Publicidad & Marketing', cat: 'expense-marketing' },
+        { ref: 'Sueldos & Honorarios Oficina', cat: 'expense-salaries' },
+        { ref: 'Impuestos / Contribuciones', cat: 'expense-taxes' },
+        { ref: 'Otros Gastos Oficina', cat: 'expense-other' }
+    ];
+
+    // Find any additional custom references in past expenses
+    const pastExpenses = transactions.filter(t => t.type === 'expense');
+    const customRefs = new Set();
+    pastExpenses.forEach(t => {
+        if (t.reference) customRefs.add(t.reference.trim());
+    });
+
+    customRefs.forEach(ref => {
+        const exists = defaultTemplateItems.some(item => item.ref.toLowerCase() === ref.toLowerCase());
+        if (!exists) {
+            const pastTx = pastExpenses.find(t => t.reference.trim() === ref);
+            defaultTemplateItems.push({
+                ref: ref,
+                cat: pastTx ? pastTx.category : 'expense-other'
+            });
+        }
+    });
+
+    // Default payment date for the selected period
+    const [year, month] = periodKey.split('-');
+    const defaultPaymentDate = `${year}-${month}-05`;
+
+    elements.batchExpensesTbody.innerHTML = '';
+
+    defaultTemplateItems.forEach(item => {
+        // Find last registered amount for this reference
+        const lastTx = pastExpenses.find(t => t.reference.toLowerCase().trim() === item.ref.toLowerCase().trim());
+        const lastAmount = lastTx ? Number(lastTx.amount) : 0;
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td style="text-align: center;">
+                <input type="checkbox" class="batch-row-check" checked>
+            </td>
+            <td>
+                <input type="text" class="batch-table-input batch-ref-input" value="${item.ref}">
+            </td>
+            <td>
+                <select class="batch-table-input batch-cat-select">
+                    ${getCategorySelectHtml(item.cat)}
+                </select>
+            </td>
+            <td>
+                <input type="number" class="batch-table-input batch-amount-input" value="${lastAmount}" min="0" step="1000" style="text-align: right; font-weight: 700;">
+            </td>
+            <td>
+                <input type="date" class="batch-table-input batch-date-input" value="${defaultPaymentDate}">
+            </td>
+            <td>
+                <select class="batch-table-input batch-status-select">
+                    <option value="paid">Pagado</option>
+                    <option value="pending">Pendiente</option>
+                </select>
+            </td>
+            <td style="text-align: center;">
+                <button type="button" class="btn btn-danger btn-icon btn-remove-batch-row" title="Eliminar fila">
+                    <i data-lucide="trash-2"></i>
+                </button>
+            </td>
+        `;
+
+        elements.batchExpensesTbody.appendChild(tr);
+    });
+
+    // Attach live change listeners for inputs
+    const inputs = elements.batchExpensesTbody.querySelectorAll('.batch-amount-input, .batch-row-check');
+    inputs.forEach(input => {
+        input.addEventListener('input', updateBatchTotalSummary);
+        input.addEventListener('change', updateBatchTotalSummary);
+    });
+
+    // Attach row delete triggers
+    const delBtns = elements.batchExpensesTbody.querySelectorAll('.btn-remove-batch-row');
+    delBtns.forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            btn.closest('tr').remove();
+            updateBatchTotalSummary();
+        });
+    });
+
+    lucide.createIcons({
+        attrs: { 'data-lucide': true },
+        nameAttr: 'data-lucide',
+        nodeList: elements.batchExpensesTbody.querySelectorAll('[data-lucide]')
+    });
+
+    updateBatchTotalSummary();
+}
+
+function addBatchExpenseRow() {
+    const periodKey = elements.batchMonthInput.value || new Date().toISOString().substring(0, 7);
+    const [year, month] = periodKey.split('-');
+    const defaultPaymentDate = `${year}-${month}-05`;
+
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+        <td style="text-align: center;">
+            <input type="checkbox" class="batch-row-check" checked>
+        </td>
+        <td>
+            <input type="text" class="batch-table-input batch-ref-input" placeholder="Nombre de proveedor / concepto...">
+        </td>
+        <td>
+            <select class="batch-table-input batch-cat-select">
+                ${getCategorySelectHtml('expense-other')}
+            </select>
+        </td>
+        <td>
+            <input type="number" class="batch-table-input batch-amount-input" value="0" min="0" step="1000" style="text-align: right; font-weight: 700;">
+        </td>
+        <td>
+            <input type="date" class="batch-table-input batch-date-input" value="${defaultPaymentDate}">
+        </td>
+        <td>
+            <select class="batch-table-input batch-status-select">
+                <option value="paid">Pagado</option>
+                <option value="pending">Pendiente</option>
+            </select>
+        </td>
+        <td style="text-align: center;">
+            <button type="button" class="btn btn-danger btn-icon btn-remove-batch-row" title="Eliminar fila">
+                <i data-lucide="trash-2"></i>
+            </button>
+        </td>
+    `;
+
+    elements.batchExpensesTbody.appendChild(tr);
+
+    const inputs = tr.querySelectorAll('.batch-amount-input, .batch-row-check');
+    inputs.forEach(input => {
+        input.addEventListener('input', updateBatchTotalSummary);
+        input.addEventListener('change', updateBatchTotalSummary);
+    });
+
+    const delBtn = tr.querySelector('.btn-remove-batch-row');
+    delBtn.addEventListener('click', () => {
+        tr.remove();
+        updateBatchTotalSummary();
+    });
+
+    lucide.createIcons({
+        attrs: { 'data-lucide': true },
+        nameAttr: 'data-lucide',
+        nodeList: tr.querySelectorAll('[data-lucide]')
+    });
+}
+
+function updateBatchTotalSummary() {
+    let total = 0;
+    const rows = elements.batchExpensesTbody.querySelectorAll('tr');
+    
+    rows.forEach(tr => {
+        const check = tr.querySelector('.batch-row-check');
+        const amountInput = tr.querySelector('.batch-amount-input');
+        
+        if (check && check.checked && amountInput) {
+            const val = parseFloat(amountInput.value) || 0;
+            total += Math.abs(val);
+        }
+    });
+
+    elements.batchTotalSummary.textContent = `Total Gastos Seleccionados: ${formatCurrency(total)}`;
+}
+
+function saveBatchExpenses() {
+    if (!currentUser) {
+        showToast('Debes iniciar sesión para registrar gastos.', 'error');
+        return;
+    }
+
+    const periodKey = elements.batchMonthInput.value || new Date().toISOString().substring(0, 7);
+    const rows = elements.batchExpensesTbody.querySelectorAll('tr');
+    
+    const itemsToSave = [];
+
+    rows.forEach(tr => {
+        const check = tr.querySelector('.batch-row-check');
+        if (check && check.checked) {
+            const refInput = tr.querySelector('.batch-ref-input');
+            const catSelect = tr.querySelector('.batch-cat-select');
+            const amountInput = tr.querySelector('.batch-amount-input');
+            const dateInput = tr.querySelector('.batch-date-input');
+            const statusSelect = tr.querySelector('.batch-status-select');
+
+            const reference = refInput ? refInput.value.trim() : '';
+            const category = catSelect ? catSelect.value : 'expense-other';
+            const amount = amountInput ? Math.abs(parseFloat(amountInput.value) || 0) : 0;
+            const date = dateInput ? dateInput.value : `${periodKey}-01`;
+            const status = statusSelect ? statusSelect.value : 'paid';
+
+            if (reference && amount > 0) {
+                itemsToSave.push({
+                    reference,
+                    category,
+                    amount,
+                    date,
+                    period: periodKey,
+                    status
+                });
+            }
+        }
+    });
+
+    if (itemsToSave.length === 0) {
+        showToast('Por favor, selecciona al menos un gasto con monto mayor a 0 para guardar.', 'error');
+        return;
+    }
+
+    if (confirm(`Se registrarán ${itemsToSave.length} gastos en el período ${formatPeriodString(periodKey)} por un total de ${elements.batchTotalSummary.textContent.replace('Total Gastos Seleccionados: ', '')}.\n\n¿Deseas continuar?`)) {
+        const promises = itemsToSave.map(item => {
+            const finalId = 'tx-' + Date.now() + Math.random().toString(36).substring(2, 7);
+            const txRef = doc(db, "transactions", finalId);
+            return setDoc(txRef, {
+                id: finalId,
+                userId: currentUser.uid,
+                profile: currentProfile,
+                type: 'expense',
+                category: item.category,
+                date: item.date,
+                period: item.period,
+                reference: item.reference,
+                amount: item.amount,
+                status: item.status,
+                notes: 'Carga masiva mensual',
+                attachment: null
+            });
+        });
+
+        Promise.all(promises)
+            .then(() => {
+                showToast(`¡Se registraron ${itemsToSave.length} gastos exitosamente en la nube!`);
+                closeBatchExpensesModal();
+            })
+            .catch(err => {
+                showToast('Error al guardar gastos masivos en la nube.', 'error');
+                console.error(err);
+            });
+    }
 }
 
 function exportToExcel() {

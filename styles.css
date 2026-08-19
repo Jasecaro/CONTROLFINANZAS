@@ -2309,3 +2309,24 @@ body.theme-laboral {
         display: none !important;
     }
 }
+
+/* Batch Expense Table Controls */
+.batch-table-input {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--border-color);
+    color: var(--color-text-main);
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 0.82rem;
+    font-weight: 500;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.batch-table-input:focus {
+    border-color: var(--color-primary);
+    background: rgba(255, 255, 255, 0.08);
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+}
+
