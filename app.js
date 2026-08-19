@@ -185,6 +185,34 @@ const elements = {
 
 // --- 2. INITIALIZATION & STORAGE ---
 document.addEventListener('DOMContentLoaded', () => {
+    // --- GLOBAL EVENT DELEGATION (catches ALL button clicks by ID) ---
+    document.body.addEventListener('click', (e) => {
+        const btn = e.target.closest('[id]');
+        if (!btn) return;
+        const id = btn.id;
+
+        if (id === 'btn-open-batch-expenses' || id === 'btn-open-batch-expenses-sidebar') {
+            openBatchExpensesModal();
+        } else if (id === 'btn-close-batch-modal' || id === 'btn-cancel-batch-modal') {
+            closeBatchExpensesModal();
+        } else if (id === 'btn-save-batch-expenses') {
+            saveBatchExpenses();
+        } else if (id === 'btn-add-batch-row') {
+            addBatchExpenseRow();
+        } else if (id === 'btn-reload-batch-template') {
+            const mi = document.getElementById('batch-month-input');
+            populateBatchExpensesTable(mi ? mi.value : new Date().toISOString().substring(0, 7));
+        } else if (id === 'btn-open-modal') {
+            openModal(false);
+        } else if (id === 'btn-empty-add') {
+            openModal(false);
+        } else if (id === 'btn-close-modal' || id === 'btn-cancel-modal') {
+            closeModal();
+        } else if (id === 'btn-mobile-add') {
+            openModal(false);
+        }
+    });
+
     initApp();
 });
 
@@ -214,7 +242,7 @@ function initApp() {
     updateUI();
     
     // Initialize Lucide Icons
-    lucide.createIcons();
+    if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
 function setupHeaderDate() {
@@ -1449,6 +1477,7 @@ function setupFormControls() {
 function updateTypeSelectorCardUI(activeType) {
     const cardIncome = document.querySelector('.type-selector-card.type-income');
     const cardExpense = document.querySelector('.type-selector-card.type-expense');
+    if (!cardIncome || !cardExpense) return;
     
     if (activeType === 'income') {
         cardIncome.classList.add('active');
@@ -1460,6 +1489,7 @@ function updateTypeSelectorCardUI(activeType) {
 }
 
 function populateFormCategories(type, selectVal = '') {
+    if (!elements.formCategorySelect) return;
     elements.formCategorySelect.innerHTML = '';
     const cats = CATEGORIES[type];
     
@@ -1781,25 +1811,27 @@ function setupFilters() {
     }
     
     // Setup sorting column clicks
-    const headers = elements.mainTransactionsTable.querySelectorAll('th.sortable');
-    headers.forEach(th => {
-        th.addEventListener('click', () => {
-            const field = th.getAttribute('data-sort');
-            if (sortField === field) {
-                // Toggle direction
-                sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
-            } else {
-                // New field, default to desc for date/amount, asc for text fields
-                sortField = field;
-                sortDirection = (field === 'date' || field === 'amount') ? 'desc' : 'asc';
-            }
-            renderTransactionsTable();
+    const mainTable = elements.mainTransactionsTable;
+    if (mainTable) {
+        const headers = mainTable.querySelectorAll('th.sortable');
+        headers.forEach(th => {
+            th.addEventListener('click', () => {
+                const field = th.getAttribute('data-sort');
+                if (sortField === field) {
+                    sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+                } else {
+                    sortField = field;
+                    sortDirection = (field === 'date' || field === 'amount') ? 'desc' : 'asc';
+                }
+                renderTransactionsTable();
+            });
         });
-    });
+    }
 }
 
 function populatePeriodFilter() {
     const monthSelect = elements.filterMonth;
+    if (!monthSelect) return;
     const selectedVal = monthSelect.value;
     
     monthSelect.innerHTML = '<option value="all">Todos los tiempos</option>';
