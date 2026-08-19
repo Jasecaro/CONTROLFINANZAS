@@ -1,4 +1,4 @@
-﻿/* ==========================================================================
+/* ==========================================================================
    LEXPROP FINANZAS - APPLICATION LOGIC
    ========================================================================== */
 
@@ -3106,3 +3106,22 @@ function setupMobileControls() {
     
     // Drawer Logout button
     elements.btnDrawerLogout?.addEventListener('click', (e) => {
+        e.preventDefault();
+        signOut(auth)
+            .then(() => {
+                showToast('Sesión cerrada correctamente.', 'info');
+                closeDrawer();
+            })
+            .catch((error) => {
+                showToast('Error al cerrar sesión.', 'error');
+            });
+    });
+}
+
+// Global Exports
+window.openBatchExpensesModal = openBatchExpensesModal;
+window.closeBatchExpensesModal = closeBatchExpensesModal;
+window.openModal = openModal;
+window.closeModal = closeModal;
+window.switchView = switchView;
+window.updateBatchTotalSummary = updateBatchTotalSummary;
