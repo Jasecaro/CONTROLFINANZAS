@@ -1265,89 +1265,88 @@ function switchView(viewName) {
 }
 
 function openModal(editMode = false) {
+    if (!elements.modalOverlay) return;
     elements.modalOverlay.classList.add('active');
     
-    const typeChecked = document.querySelector('input[name="tx-type"]:checked').value;
+    const checkedRadio = document.querySelector('input[name="tx-type"]:checked');
+    const typeChecked = checkedRadio ? checkedRadio.value : 'income';
     populateFormCategories(typeChecked);
     
     // Reset attachments preview
     currentAttachment = null;
-    elements.formAttachment.value = '';
-    elements.formAttachmentPreview.style.display = 'none';
-    elements.formAttachmentName.textContent = '';
+    if (elements.formAttachment) elements.formAttachment.value = '';
+    if (elements.formAttachmentPreview) elements.formAttachmentPreview.style.display = 'none';
+    if (elements.formAttachmentName) elements.formAttachmentName.textContent = '';
     
     if (!editMode) {
-        elements.modalTitle.textContent = 'Registrar Nueva Transacción';
-        elements.formTxId.value = '';
-        elements.form.reset();
+        if (elements.modalTitle) elements.modalTitle.textContent = 'Registrar Nueva Transacción';
+        if (elements.formTxId) elements.formTxId.value = '';
+        if (elements.form) elements.form.reset();
         
         updateTypeSelectorCardUI('income');
         populateFormCategories('income');
         
         const todayStr = new Date().toISOString().split('T')[0];
-        elements.formDate.value = todayStr;
-        elements.formPeriod.value = todayStr.substring(0, 7);
+        if (elements.formDate) elements.formDate.value = todayStr;
+        if (elements.formPeriod) elements.formPeriod.value = todayStr.substring(0, 7);
         
-        elements.formStatus.value = 'paid';
+        if (elements.formStatus) elements.formStatus.value = 'paid';
     }
 }
 
 function closeModal() {
-    elements.modalOverlay.classList.remove('active');
-    elements.form.reset();
+    if (elements.modalOverlay) elements.modalOverlay.classList.remove('active');
+    if (elements.form) elements.form.reset();
 }
 
 function setupFormControls() {
     // Open triggers
-    elements.btnOpenModal.addEventListener('click', () => openModal(false));
-    if (elements.btnEmptyAdd) {
-        elements.btnEmptyAdd.addEventListener('click', () => openModal(false));
-    }
+    elements.btnOpenModal?.addEventListener('click', () => openModal(false));
+    elements.btnEmptyAdd?.addEventListener('click', () => openModal(false));
     
     // Close triggers
-    elements.btnCloseModal.addEventListener('click', closeModal);
-    elements.btnCancelModal.addEventListener('click', closeModal);
-    elements.modalOverlay.addEventListener('click', (e) => {
+    elements.btnCloseModal?.addEventListener('click', closeModal);
+    elements.btnCancelModal?.addEventListener('click', closeModal);
+    elements.modalOverlay?.addEventListener('click', (e) => {
         if (e.target === elements.modalOverlay) closeModal();
     });
     
     // Auto-update imputation period when transaction date changes!
-    elements.formDate.addEventListener('change', (e) => {
-        if (e.target.value) {
+    elements.formDate?.addEventListener('change', (e) => {
+        if (e.target.value && elements.formPeriod) {
             elements.formPeriod.value = e.target.value.substring(0, 7);
         }
     });
     
     // Handle toggle Income / Expense in Form
-    elements.formTypeRadios.forEach(radio => {
+    elements.formTypeRadios?.forEach(radio => {
         radio.addEventListener('change', (e) => {
             const val = e.target.value;
             updateTypeSelectorCardUI(val);
             populateFormCategories(val);
             
             if (val === 'income') {
-                elements.formReferenceLabel.innerHTML = 'Cliente o Caso Judicial / Propiedad <span class="required">*</span>';
-                elements.formReference.placeholder = 'Nombre del cliente, número de causa o dirección de propiedad...';
-                elements.formStatus.options[0].text = 'Cobrado / Pagado';
+                if (elements.formReferenceLabel) elements.formReferenceLabel.innerHTML = 'Cliente o Caso Judicial / Propiedad <span class="required">*</span>';
+                if (elements.formReference) elements.formReference.placeholder = 'Nombre del cliente, número de causa o dirección de propiedad...';
+                if (elements.formStatus?.options?.[0]) elements.formStatus.options[0].text = 'Cobrado / Pagado';
             } else {
-                elements.formReferenceLabel.innerHTML = 'Detalle de Proveedor / Concepto Gasto <span class="required">*</span>';
-                elements.formReference.placeholder = 'Luz S.A., Aguas Andinas, VTR, Papelería central...';
-                elements.formStatus.options[0].text = 'Pagado';
+                if (elements.formReferenceLabel) elements.formReferenceLabel.innerHTML = 'Detalle de Proveedor / Concepto Gasto <span class="required">*</span>';
+                if (elements.formReference) elements.formReference.placeholder = 'Luz S.A., Aguas Andinas, VTR, Papelería central...';
+                if (elements.formStatus?.options?.[0]) elements.formStatus.options[0].text = 'Pagado';
             }
         });
     });
     
     // --- ATTACHMENT UPLOAD TRIGGER & READER ---
-    elements.formAttachment.addEventListener('change', (e) => {
+    elements.formAttachment?.addEventListener('change', (e) => {
         const file = e.target.files[0];
         if (!file) return;
         
-        // Enforce 1MB maximum limit to preserve localStorage
         if (file.size > 1024 * 1024) {
             showToast('El archivo supera el límite de 1MB. Por favor, sube un archivo más ligero.', 'error');
-            elements.formAttachment.value = '';
-            elements.formAttachmentPreview.style.display = 'none';
-            elements.formAttachmentName.textContent = '';
+            if (elements.formAttachment) elements.formAttachment.value = '';
+            if (elements.formAttachmentPreview) elements.formAttachmentPreview.style.display = 'none';
+            if (elements.formAttachmentName) elements.formAttachmentName.textContent = '';
             currentAttachment = null;
             return;
         }
@@ -1357,33 +1356,32 @@ function setupFormControls() {
             currentAttachment = {
                 name: file.name,
                 type: file.type,
-                data: evt.target.result // base64 string
+                data: evt.target.result
             };
-            elements.formAttachmentName.textContent = file.name;
-            elements.formAttachmentPreview.style.display = 'flex';
+            if (elements.formAttachmentName) elements.formAttachmentName.textContent = file.name;
+            if (elements.formAttachmentPreview) elements.formAttachmentPreview.style.display = 'flex';
             showToast('Comprobante cargado correctamente.');
         };
         reader.readAsDataURL(file);
     });
     
     // Remove attachment button
-    elements.btnRemoveAttachment.addEventListener('click', () => {
+    elements.btnRemoveAttachment?.addEventListener('click', () => {
         currentAttachment = null;
-        elements.formAttachment.value = '';
-        elements.formAttachmentPreview.style.display = 'none';
-        elements.formAttachmentName.textContent = '';
+        if (elements.formAttachment) elements.formAttachment.value = '';
+        if (elements.formAttachmentPreview) elements.formAttachmentPreview.style.display = 'none';
+        if (elements.formAttachmentName) elements.formAttachmentName.textContent = '';
         showToast('Comprobante removido.', 'info');
     });
     
     // --- CLIPBOARD PASTE (Ctrl+V) SCREENSHOT SUPPORT ---
-    elements.form.addEventListener('paste', (e) => {
+    elements.form?.addEventListener('paste', (e) => {
         const items = (e.clipboardData || e.originalEvent.clipboardData).items;
         for (let index in items) {
             const item = items[index];
             if (item.kind === 'file' && item.type.startsWith('image/')) {
                 const blob = item.getAsFile();
                 
-                // Enforce 1MB maximum limit to preserve localStorage
                 if (blob.size > 1024 * 1024) {
                     showToast('El pantallazo pegado supera el límite de 1MB. Por favor, sube un archivo más ligero.', 'error');
                     return;
@@ -1399,16 +1397,15 @@ function setupFormControls() {
                     currentAttachment = {
                         name: fileName,
                         type: 'image/jpeg',
-                        data: evt.target.result // base64 string
+                        data: evt.target.result
                     };
                     
-                    elements.formAttachmentName.textContent = fileName;
-                    elements.formAttachmentPreview.style.display = 'flex';
+                    if (elements.formAttachmentName) elements.formAttachmentName.textContent = fileName;
+                    if (elements.formAttachmentPreview) elements.formAttachmentPreview.style.display = 'flex';
                     showToast('Pantallazo pegado correctamente desde el portapapeles.');
                 };
                 reader.readAsDataURL(blob);
                 
-                // Prevent default paste action in input fields if image was handled
                 e.preventDefault();
                 break;
             }
@@ -1417,23 +1414,23 @@ function setupFormControls() {
     
     // --- VOUCHER CLOSE EVENTS ---
     const closeVoucher = () => {
-        elements.voucherModal.classList.remove('active');
-        elements.voucherContent.innerHTML = '';
+        if (elements.voucherModal) elements.voucherModal.classList.remove('active');
+        if (elements.voucherContent) elements.voucherContent.innerHTML = '';
     };
     
-    elements.btnCloseVoucher.addEventListener('click', closeVoucher);
-    elements.btnCloseVoucherFoot.addEventListener('click', closeVoucher);
-    elements.voucherModal.addEventListener('click', (e) => {
+    elements.btnCloseVoucher?.addEventListener('click', closeVoucher);
+    elements.btnCloseVoucherFoot?.addEventListener('click', closeVoucher);
+    elements.voucherModal?.addEventListener('click', (e) => {
         if (e.target === elements.voucherModal) closeVoucher();
     });
     
     // Printer trigger
-    elements.btnPrintVoucher.addEventListener('click', () => {
+    elements.btnPrintVoucher?.addEventListener('click', () => {
         window.print();
     });
     
     // Form Submission
-    elements.form.addEventListener('submit', (e) => {
+    elements.form?.addEventListener('submit', (e) => {
         e.preventDefault();
         saveFormTx();
     });
@@ -2736,23 +2733,24 @@ function handleReminderCopy() {
 }
 
 function setupExportReminderControls() {
-    elements.btnCloseReminder.addEventListener('click', closeExportReminderModal);
-    elements.btnCloseReminderFoot.addEventListener('click', closeExportReminderModal);
-    elements.btnReminderEmail.addEventListener('click', handleReminderEmail);
-    elements.btnReminderCopy.addEventListener('click', handleReminderCopy);
-    elements.exportReminderModal.addEventListener('click', (e) => {
+    elements.btnCloseReminder?.addEventListener('click', closeExportReminderModal);
+    elements.btnCloseReminderFoot?.addEventListener('click', closeExportReminderModal);
+    elements.btnReminderEmail?.addEventListener('click', handleReminderEmail);
+    elements.btnReminderCopy?.addEventListener('click', handleReminderCopy);
+    elements.exportReminderModal?.addEventListener('click', (e) => {
         if (e.target === elements.exportReminderModal) closeExportReminderModal();
     });
 }
 
 function setupAuthControls() {
     // Handle Login Form Submit
-    elements.loginForm.addEventListener('submit', (e) => {
+    elements.loginForm?.addEventListener('submit', (e) => {
         e.preventDefault();
-        const email = elements.loginEmail.value.trim();
+        const email = elements.loginEmail?.value?.trim();
         const password = elements.loginPassword;
+        if (!email || !password) return;
         
-        elements.loginErrorMsg.textContent = 'Autenticando...';
+        if (elements.loginErrorMsg) elements.loginErrorMsg.textContent = 'Autenticando...';
         
         signInWithEmailAndPassword(auth, email, password.value)
             .then(() => {
@@ -2768,12 +2766,12 @@ function setupAuthControls() {
                 } else if (error.code === 'auth/wrong-password') {
                     message = 'Contraseña incorrecta.';
                 }
-                elements.loginErrorMsg.textContent = message;
+                if (elements.loginErrorMsg) elements.loginErrorMsg.textContent = message;
             });
     });
     
     // Handle Logout Click
-    elements.btnLogout.addEventListener('click', (e) => {
+    elements.btnLogout?.addEventListener('click', (e) => {
         e.preventDefault();
         signOut(auth)
             .then(() => {
@@ -2785,8 +2783,8 @@ function setupAuthControls() {
     });
     
     // Handle Profile Switcher Buttons Click
-    elements.profileSwitchEmpresa.addEventListener('click', () => switchProfile('empresa'));
-    elements.profileSwitchPersonal.addEventListener('click', () => switchProfile('personal'));
+    elements.profileSwitchEmpresa?.addEventListener('click', () => switchProfile('empresa'));
+    elements.profileSwitchPersonal?.addEventListener('click', () => switchProfile('personal'));
 }
 
 function switchProfile(profile) {
@@ -2989,37 +2987,37 @@ onAuthStateChanged(auth, async (user) => {
 
 function setupMobileControls() {
     const openDrawer = () => {
-        elements.mobileDrawer.classList.add('active');
+        elements.mobileDrawer?.classList.add('active');
     };
     
     const closeDrawer = () => {
-        elements.mobileDrawer.classList.remove('active');
+        elements.mobileDrawer?.classList.remove('active');
     };
     
     // Toggle menu button opens drawer
-    elements.btnMenuToggle.addEventListener('click', openDrawer);
+    elements.btnMenuToggle?.addEventListener('click', openDrawer);
     
     // Close button and overlay close drawer
-    elements.btnCloseDrawer.addEventListener('click', closeDrawer);
-    elements.mobileDrawerOverlay.addEventListener('click', closeDrawer);
+    elements.btnCloseDrawer?.addEventListener('click', closeDrawer);
+    elements.mobileDrawerOverlay?.addEventListener('click', closeDrawer);
     
     // Floating Add button on mobile opens transaction modal
-    elements.btnMobileAdd.addEventListener('click', () => {
+    elements.btnMobileAdd?.addEventListener('click', () => {
         openModal(false);
     });
     
     // Profile Switchers inside Drawer
-    elements.drawerSwitchEmpresa.addEventListener('click', () => {
+    elements.drawerSwitchEmpresa?.addEventListener('click', () => {
         switchProfile('empresa');
         closeDrawer();
     });
-    elements.drawerSwitchPersonal.addEventListener('click', () => {
+    elements.drawerSwitchPersonal?.addEventListener('click', () => {
         switchProfile('personal');
         closeDrawer();
     });
     
     // Drawer Logout button
-    elements.btnDrawerLogout.addEventListener('click', (e) => {
+    elements.btnDrawerLogout?.addEventListener('click', (e) => {
         e.preventDefault();
         signOut(auth)
             .then(() => {
