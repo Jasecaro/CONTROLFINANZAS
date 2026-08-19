@@ -10,6 +10,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <!-- Chart.js CDN -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- SheetJS Excel CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <!-- Lucide Icons CDN -->
     <script src="https://unpkg.com/lucide@latest"></script>
     <link rel="stylesheet" href="styles.css?v=2">
@@ -236,7 +238,15 @@
                                 <input type="text" id="filter-search" placeholder="Buscar cliente, caso, propiedad o notas...">
                             </div>
                             <div class="action-buttons" style="display: flex; gap: 8px; flex-wrap: wrap;">
-                                <button class="btn btn-secondary" id="btn-export-csv" title="Exportar datos a Excel/CSV">
+                                <button class="btn btn-excel" id="btn-export-excel" title="Exportar reporte ordenado a archivo Excel (.xlsx)">
+                                    <i data-lucide="file-spreadsheet"></i>
+                                    <span>Exportar Excel (.xlsx)</span>
+                                </button>
+                                <button class="btn btn-secondary" id="btn-clone-prev-month" title="Clonar todos los gastos del mes anterior al mes actual">
+                                    <i data-lucide="copy"></i>
+                                    <span>Clonar Gastos Mes Anterior</span>
+                                </button>
+                                <button class="btn btn-secondary" id="btn-export-csv" title="Exportar datos a CSV">
                                     <i data-lucide="download"></i>
                                     <span>Exportar CSV</span>
                                 </button>
@@ -407,8 +417,18 @@
 
                     <!-- Summary Table -->
                     <div class="dashboard-card">
-                        <div class="card-title-bar">
+                        <div class="card-title-bar" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
                             <h3>Resumen Mensual Consolidado</h3>
+                            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                                <button class="btn btn-excel" id="btn-export-reports-excel" title="Descargar Resumen Mensual y Gastos Ordenados en Excel (.xlsx)">
+                                    <i data-lucide="file-spreadsheet"></i>
+                                    <span>Descargar Excel (.xlsx)</span>
+                                </button>
+                                <button class="btn btn-secondary" id="btn-print-reports-pdf" title="Imprimir o guardar como PDF">
+                                    <i data-lucide="printer"></i>
+                                    <span>Imprimir / PDF</span>
+                                </button>
+                            </div>
                         </div>
                         <div class="table-container">
                             <table class="data-table">

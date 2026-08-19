@@ -93,6 +93,10 @@ const elements = {
     filterStatus: document.getElementById('filter-status'),
     filterMonth: document.getElementById('filter-month'),
     btnExportCsv: document.getElementById('btn-export-csv'),
+    btnExportExcel: document.getElementById('btn-export-excel'),
+    btnClonePrevMonth: document.getElementById('btn-clone-prev-month'),
+    btnExportReportsExcel: document.getElementById('btn-export-reports-excel'),
+    btnPrintReportsPdf: document.getElementById('btn-print-reports-pdf'),
     btnEmptyAdd: document.getElementById('btn-empty-add'),
     btnClearAll: document.getElementById('btn-clear-all'),
     btnExportJson: document.getElementById('btn-export-json'),
@@ -669,6 +673,9 @@ function renderTransactionsTable() {
                 <div class="actions-cell">
                     <button class="btn btn-secondary btn-icon" onclick="viewVoucher('${tx.id}')" title="Ver Voucher / Comprobante">
                         <i data-lucide="file-text"></i>
+                    </button>
+                    <button class="btn btn-secondary btn-icon" onclick="duplicateTx('${tx.id}')" title="Duplicar / Repetir Transacción">
+                        <i data-lucide="copy"></i>
                     </button>
                     <button class="btn btn-secondary btn-icon" onclick="editTx('${tx.id}')" title="Editar">
                         <i data-lucide="edit-3"></i>
@@ -1588,6 +1595,98 @@ window.deleteTx = function(id) {
     }
 };
 
+window.duplicateTx = function(id) {
+    const tx = transactions.find(t => t.id === id);
+    if (!tx) return;
+    
+    openModal(false);
+    elements.modalTitle.textContent = 'Duplicar / Repetir Transacción';
+    
+    elements.formTypeRadios.forEach(radio => {
+        if (radio.value === tx.type) {
+            radio.checked = true;
+        }
+    });
+    updateTypeSelectorCardUI(tx.type);
+    populateFormCategories(tx.type, tx.category);
+    
+    const today = new Date();
+    const todayStr = today.toISOString().substring(0, 10);
+    const periodStr = todayStr.substring(0, 7);
+    
+    elements.formDate.value = todayStr;
+    elements.formPeriod.value = periodStr;
+    elements.formReference.value = tx.reference;
+    elements.formAmount.value = tx.amount;
+    elements.formStatus.value = tx.status || 'paid';
+    elements.formNotes.value = tx.notes ? `${tx.notes} (Recurrente)` : 'Transacción duplicada / recurrente';
+    
+    showToast('Datos precargados. Revisa el monto o fecha y presiona Registrar.');
+};
+
+function duplicatePreviousMonthExpenses() {
+    if (!currentUser) {
+        showToast('Debes iniciar sesión para duplicar gastos.', 'error');
+        return;
+    }
+    
+    const today = new Date();
+    const currentPeriod = today.toISOString().substring(0, 7);
+    
+    const prevMonthDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+    const prevPeriod = prevMonthDate.toISOString().substring(0, 7);
+    
+    const prevExpenses = transactions.filter(t => t.period === prevPeriod && t.type === 'expense');
+    
+    if (prevExpenses.length === 0) {
+        showToast(`No se encontraron gastos registrados en el mes anterior (${formatPeriodString(prevPeriod)}).`, 'error');
+        return;
+    }
+    
+    const currentExpensesRefs = transactions
+        .filter(t => t.period === currentPeriod && t.type === 'expense')
+        .map(t => t.reference.toLowerCase().trim());
+        
+    const expensesToClone = prevExpenses.filter(t => !currentExpensesRefs.includes(t.reference.toLowerCase().trim()));
+    
+    if (expensesToClone.length === 0) {
+        showToast(`Los gastos del mes anterior ya están registrados en el mes actual (${formatPeriodString(currentPeriod)}).`, 'info');
+        return;
+    }
+    
+    const expenseSummaryText = expensesToClone.map(e => `• ${e.reference}: ${formatCurrency(e.amount)}`).join('\n');
+    if (confirm(`Se clonarán ${expensesToClone.length} gastos del mes anterior (${formatPeriodString(prevPeriod)}) al mes actual (${formatPeriodString(currentPeriod)}):\n\n${expenseSummaryText}\n\n¿Deseas continuar?`)) {
+        const todayStr = today.toISOString().substring(0, 10);
+        const promises = expensesToClone.map(t => {
+            const finalId = 'tx-' + Date.now() + Math.random().toString(36).substring(2, 7);
+            const txRef = doc(db, "transactions", finalId);
+            return setDoc(txRef, {
+                id: finalId,
+                userId: currentUser.uid,
+                profile: currentProfile,
+                type: 'expense',
+                category: t.category,
+                date: todayStr,
+                period: currentPeriod,
+                reference: t.reference,
+                amount: t.amount,
+                status: t.status || 'paid',
+                notes: `Clonado de ${formatPeriodString(prevPeriod)}`,
+                attachment: null
+            });
+        });
+        
+        Promise.all(promises)
+            .then(() => {
+                showToast(`¡Se clonaron ${expensesToClone.length} gastos al mes actual exitosamente!`);
+            })
+            .catch(err => {
+                showToast('Error al clonar gastos en la nube.', 'error');
+                console.error(err);
+            });
+    }
+}
+
 // --- 7. FILTER SYSTEM & PERIOD CONVERSION ---
 function setupFilters() {
     const triggerFilter = () => {
@@ -1609,6 +1708,18 @@ function setupFilters() {
     }
     
     elements.btnExportCsv.addEventListener('click', exportToCSV);
+    if (elements.btnExportExcel) {
+        elements.btnExportExcel.addEventListener('click', exportToExcel);
+    }
+    if (elements.btnClonePrevMonth) {
+        elements.btnClonePrevMonth.addEventListener('click', duplicatePreviousMonthExpenses);
+    }
+    if (elements.btnExportReportsExcel) {
+        elements.btnExportReportsExcel.addEventListener('click', exportToExcel);
+    }
+    if (elements.btnPrintReportsPdf) {
+        elements.btnPrintReportsPdf.addEventListener('click', printReportsPdf);
+    }
     if (elements.btnClearAll) {
         elements.btnClearAll.addEventListener('click', clearAllTransactions);
     }
@@ -1830,6 +1941,103 @@ function exportToCSV() {
     document.body.removeChild(link);
     
     openExportReminderModal('csv', csvContent, filename);
+}
+
+function exportToExcel() {
+    if (typeof XLSX === 'undefined') {
+        showToast('La biblioteca para exportar a Excel no se ha cargado aún.', 'error');
+        return;
+    }
+    if (transactions.length === 0) {
+        showToast('No hay transacciones registradas para exportar.', 'error');
+        return;
+    }
+    
+    const wb = XLSX.utils.book_new();
+
+    // --- HOJA 1: Resumen Mensual Consolidado ---
+    const monthlySummary = {};
+    transactions.forEach(tx => {
+        const monthKey = tx.period;
+        if (!monthlySummary[monthKey]) {
+            monthlySummary[monthKey] = { judicial: 0, brokerage: 0, expenses: 0 };
+        }
+        const amt = Number(tx.amount);
+        if (tx.type === 'income') {
+            if (tx.category.startsWith('judicial')) monthlySummary[monthKey].judicial += amt;
+            else monthlySummary[monthKey].brokerage += amt;
+        } else if (tx.type === 'expense') {
+            monthlySummary[monthKey].expenses += amt;
+        }
+    });
+
+    const summaryData = Object.keys(monthlySummary).sort().reverse().map(monthKey => {
+        const item = monthlySummary[monthKey];
+        const totalInc = item.judicial + item.brokerage;
+        const netResult = totalInc - item.expenses;
+        const margin = totalInc > 0 ? ((netResult / totalInc) * 100).toFixed(1) + '%' : '0%';
+        return {
+            'Período Imputación': formatPeriodString(monthKey),
+            'Ingresos Judiciales ($)': item.judicial,
+            'Ingresos Corretaje ($)': item.brokerage,
+            'Ingresos Totales ($)': totalInc,
+            'Gastos Totales ($)': item.expenses,
+            'Resultado Neto ($)': netResult,
+            'Margen de Rentabilidad': margin
+        };
+    });
+
+    const wsSummary = XLSX.utils.json_to_sheet(summaryData);
+    XLSX.utils.book_append_sheet(wb, wsSummary, "Resumen Mensual");
+
+    // --- HOJA 2: Gastos por Mes (Ordenados de mayor a menor gasto) ---
+    const expenseTxs = transactions.filter(tx => tx.type === 'expense');
+    expenseTxs.sort((a, b) => {
+        if (b.period !== a.period) return b.period.localeCompare(a.period);
+        return Number(b.amount) - Number(a.amount);
+    });
+
+    const expensesData = expenseTxs.map(tx => ({
+        'Período': formatPeriodString(tx.period),
+        'Fecha de Gasto': tx.date,
+        'Categoría': getCategoryLabel(tx.type, tx.category),
+        'Proveedor / Concepto': tx.reference,
+        'Monto Gasto ($)': Number(tx.amount),
+        'Estado': tx.status === 'paid' ? 'Pagado' : 'Pendiente',
+        'Notas': tx.notes || ''
+    }));
+
+    const wsExpenses = XLSX.utils.json_to_sheet(expensesData);
+    XLSX.utils.book_append_sheet(wb, wsExpenses, "Gastos Ordenados por Mes");
+
+    // --- HOJA 3: Historial Completo ---
+    const allData = transactions.map(tx => ({
+        'ID Transacción': tx.id,
+        'Fecha': tx.date,
+        'Período': formatPeriodString(tx.period),
+        'Tipo': tx.type === 'income' ? 'Ingreso' : 'Gasto',
+        'Categoría': getCategoryLabel(tx.type, tx.category),
+        'Cliente / Proveedor / Concepto': tx.reference,
+        'Monto ($)': Number(tx.amount),
+        'Estado': tx.status === 'paid' ? 'Cobrado/Pagado' : 'Pendiente',
+        'Notas': tx.notes || ''
+    }));
+
+    const wsAll = XLSX.utils.json_to_sheet(allData);
+    XLSX.utils.book_append_sheet(wb, wsAll, "Historial Completo");
+
+    const filename = `Caro_Sebastiani_Finanzas_${new Date().toISOString().substring(0,10)}.xlsx`;
+    XLSX.writeFile(wb, filename);
+
+    showToast('¡Reporte en Excel (.xlsx) exportado con éxito!');
+}
+
+function printReportsPdf() {
+    document.body.classList.add('printing-reports');
+    window.print();
+    setTimeout(() => {
+        document.body.classList.remove('printing-reports');
+    }, 1000);
 }
 
 function clearAllTransactions() {
