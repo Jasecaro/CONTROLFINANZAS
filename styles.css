@@ -2351,4 +2351,14 @@ body.theme-laboral {
     height: 18px;
 }
 
+.batch-group-header-row td {
+    padding: 8px 14px !important;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+}
+
+.batch-group-header-row td i {
+    opacity: 0.85;
+}
+
 

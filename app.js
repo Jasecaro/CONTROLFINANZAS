@@ -31,12 +31,15 @@ let sortDirection = 'desc';
 // --- 1. CONFIGURATION & DOM REFERENCES ---
 const CATEGORIES = {
     income: [
-        { value: 'brokerage-sale', label: 'Comisión por Venta', group: 'Corretaje' },
-        { value: 'brokerage-rental', label: 'Comisión por Arriendo', group: 'Corretaje' },
-        { value: 'brokerage-administration', label: 'Administración de Propiedades', group: 'Corretaje' },
-        { value: 'judicial-litigation', label: 'Honorarios de Litigio', group: 'Judicial' },
-        { value: 'judicial-consultancy', label: 'Asesoría / Consultoría', group: 'Judicial' },
-        { value: 'judicial-notary', label: 'Trámites Notariales', group: 'Judicial' }
+        // 1. Corretaje Inmobiliario
+        { value: 'brokerage-administration', label: 'Administración de Propiedades', group: 'Corretaje Inmobiliario', order: 1 },
+        { value: 'brokerage-rental', label: 'Comisión por Arriendo', group: 'Corretaje Inmobiliario', order: 2 },
+        { value: 'brokerage-sale', label: 'Comisión por Venta', group: 'Corretaje Inmobiliario', order: 3 },
+        
+        // 2. Servicios Jurídicos & Judicial
+        { value: 'judicial-consultancy', label: 'Asesoría / Consultoría Mensual', group: 'Servicios Jurídicos & Judicial', order: 10 },
+        { value: 'judicial-litigation', label: 'Honorarios de Litigio', group: 'Servicios Jurídicos & Judicial', order: 11 },
+        { value: 'judicial-notary', label: 'Trámites Notariales', group: 'Servicios Jurídicos & Judicial', order: 12 }
     ],
     expense: [
         // 1. Servicios Básicos & Arriendo
@@ -114,6 +117,19 @@ const elements = {
     get btnCloseReportsPdf() { return document.getElementById('btn-close-reports-pdf'); },
     get btnCloseReportsPdfFoot() { return document.getElementById('btn-close-reports-pdf-foot'); },
     get btnDoPrintPdf() { return document.getElementById('btn-do-print-pdf'); },
+
+    get btnOpenBatchIncomes() { return document.getElementById('btn-open-batch-incomes'); },
+    get btnOpenBatchIncomesSidebar() { return document.getElementById('btn-open-batch-incomes-sidebar'); },
+    get batchIncomesModal() { return document.getElementById('batch-incomes-modal'); },
+    get batchIncomeMonthInput() { return document.getElementById('batch-income-month-input'); },
+    get batchIncomesTbody() { return document.getElementById('batch-incomes-tbody'); },
+    get batchIncomeTotalSummary() { return document.getElementById('batch-income-total-summary'); },
+    get batchIncomeSelectAll() { return document.getElementById('batch-income-select-all'); },
+    get btnReloadBatchIncomeTemplate() { return document.getElementById('btn-reload-batch-income-template'); },
+    get btnAddBatchIncomeRow() { return document.getElementById('btn-add-batch-income-row'); },
+    get btnCloseBatchIncomeModal() { return document.getElementById('btn-close-batch-income-modal'); },
+    get btnCancelBatchIncomeModal() { return document.getElementById('btn-cancel-batch-income-modal'); },
+    get btnSaveBatchIncomes() { return document.getElementById('btn-save-batch-incomes'); },
 
     get btnOpenBatchExpenses() { return document.getElementById('btn-open-batch-expenses'); },
     get btnOpenBatchExpensesSidebar() { return document.getElementById('btn-open-batch-expenses-sidebar'); },
@@ -202,7 +218,19 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!btn) return;
         const id = btn.id;
 
-        if (id === 'btn-open-batch-expenses' || id === 'btn-open-batch-expenses-sidebar' || id === 'drawer-btn-batch-expenses') {
+        if (id === 'btn-open-batch-incomes' || id === 'btn-open-batch-incomes-sidebar' || id === 'drawer-btn-batch-incomes') {
+            elements.mobileDrawer?.classList.remove('active');
+            openBatchIncomesModal();
+        } else if (id === 'btn-close-batch-income-modal' || id === 'btn-cancel-batch-income-modal') {
+            closeBatchIncomesModal();
+        } else if (id === 'btn-save-batch-incomes') {
+            saveBatchIncomes();
+        } else if (id === 'btn-add-batch-income-row') {
+            addBatchIncomeRow();
+        } else if (id === 'btn-reload-batch-income-template') {
+            const mi = document.getElementById('batch-income-month-input');
+            populateBatchIncomesTable(mi ? mi.value : new Date().toISOString().substring(0, 7));
+        } else if (id === 'btn-open-batch-expenses' || id === 'btn-open-batch-expenses-sidebar' || id === 'drawer-btn-batch-expenses') {
             elements.mobileDrawer?.classList.remove('active');
             openBatchExpensesModal();
         } else if (id === 'btn-close-batch-modal' || id === 'btn-cancel-batch-modal') {
@@ -320,6 +348,18 @@ function getExpenseCategoryOrder(catValue) {
 function getExpenseCategoryGroup(catValue) {
     const found = CATEGORIES.expense.find(c => c.value === catValue);
     return found ? found.group : 'Otros Gastos';
+}
+
+// Helper: get sorting order of an income category
+function getIncomeCategoryOrder(catValue) {
+    const found = CATEGORIES.income.find(c => c.value === catValue);
+    return found ? (found.order || 50) : 100;
+}
+
+// Helper: get group name of an income category
+function getIncomeCategoryGroup(catValue) {
+    const found = CATEGORIES.income.find(c => c.value === catValue);
+    return found ? found.group : 'Otros Ingresos';
 }
 
 function getMockTransactions() {
@@ -1816,6 +1856,40 @@ function setupFilters() {
         });
     }
 
+    // --- BATCH INCOMES MODAL EVENT LISTENERS ---
+    if (elements.btnOpenBatchIncomes) elements.btnOpenBatchIncomes.addEventListener('click', openBatchIncomesModal);
+    if (elements.btnOpenBatchIncomesSidebar) elements.btnOpenBatchIncomesSidebar.addEventListener('click', openBatchIncomesModal);
+    if (elements.btnCloseBatchIncomeModal) elements.btnCloseBatchIncomeModal.addEventListener('click', closeBatchIncomesModal);
+    if (elements.btnCancelBatchIncomeModal) elements.btnCancelBatchIncomeModal.addEventListener('click', closeBatchIncomesModal);
+    if (elements.batchIncomesModal) {
+        elements.batchIncomesModal.addEventListener('click', (e) => {
+            if (e.target === elements.batchIncomesModal) closeBatchIncomesModal();
+        });
+    }
+    if (elements.btnReloadBatchIncomeTemplate) {
+        elements.btnReloadBatchIncomeTemplate.addEventListener('click', () => {
+            const periodVal = elements.batchIncomeMonthInput.value || new Date().toISOString().substring(0, 7);
+            populateBatchIncomesTable(periodVal);
+        });
+    }
+    if (elements.btnAddBatchIncomeRow) elements.btnAddBatchIncomeRow.addEventListener('click', addBatchIncomeRow);
+    if (elements.btnSaveBatchIncomes) elements.btnSaveBatchIncomes.addEventListener('click', saveBatchIncomes);
+    if (elements.batchIncomeMonthInput) {
+        elements.batchIncomeMonthInput.addEventListener('change', (e) => {
+            if (e.target.value) {
+                populateBatchIncomesTable(e.target.value);
+            }
+        });
+    }
+    if (elements.batchIncomeSelectAll) {
+        elements.batchIncomeSelectAll.addEventListener('change', (e) => {
+            const isChecked = e.target.checked;
+            const rowChecks = elements.batchIncomesTbody.querySelectorAll('.batch-income-row-check');
+            rowChecks.forEach(chk => chk.checked = isChecked);
+            updateBatchIncomeTotalSummary();
+        });
+    }
+
     // --- BATCH EXPENSES MODAL EVENT LISTENERS ---
     if (elements.btnOpenBatchExpenses) elements.btnOpenBatchExpenses.addEventListener('click', openBatchExpensesModal);
     if (elements.btnOpenBatchExpensesSidebar) elements.btnOpenBatchExpensesSidebar.addEventListener('click', openBatchExpensesModal);
@@ -2689,6 +2763,435 @@ function saveBatchExpenses() {
     }
 }
 
+// --- 13. CARGA MASIVA DE INGRESOS (BATCH INCOME LOADER) ---
+function openBatchIncomesModal() {
+    const modal = document.getElementById('batch-incomes-modal');
+    if (!modal) {
+        console.error("Modal batch-incomes-modal no encontrado en el DOM.");
+        return;
+    }
+    const today = new Date();
+    const currentPeriod = today.toISOString().substring(0, 7);
+    const monthInput = document.getElementById('batch-income-month-input');
+    if (monthInput) {
+        if (!monthInput.value) {
+            monthInput.value = currentPeriod;
+        }
+        monthInput.onchange = () => populateBatchIncomesTable(monthInput.value);
+    }
+    
+    modal.classList.add('active');
+    
+    const selectAll = document.getElementById('batch-income-select-all');
+    if (selectAll) {
+        selectAll.checked = true;
+        selectAll.onchange = () => {
+            document.querySelectorAll('.batch-income-row-check').forEach(cb => { cb.checked = selectAll.checked; });
+            updateBatchIncomeTotalSummary();
+        };
+    }
+    
+    populateBatchIncomesTable(monthInput ? monthInput.value : currentPeriod);
+    if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons();
+}
+
+function closeBatchIncomesModal() {
+    const modal = document.getElementById('batch-incomes-modal');
+    if (modal) {
+        modal.classList.remove('active');
+    }
+}
+
+window.openBatchIncomesModal = openBatchIncomesModal;
+window.closeBatchIncomesModal = closeBatchIncomesModal;
+
+function getIncomeCategorySelectHtml(selectedVal = 'brokerage-administration') {
+    const groups = {};
+    CATEGORIES.income.forEach(c => {
+        const groupName = c.group || 'Ingresos';
+        if (!groups[groupName]) groups[groupName] = [];
+        groups[groupName].push(c);
+    });
+
+    let html = '';
+    Object.keys(groups).forEach(groupName => {
+        html += `<optgroup label="${groupName}">`;
+        groups[groupName].forEach(c => {
+            const isSel = c.value === selectedVal ? 'selected' : '';
+            html += `<option value="${c.value}" ${isSel}>${c.label}</option>`;
+        });
+        html += `</optgroup>`;
+    });
+    return html;
+}
+
+function populateBatchIncomesTable(periodKey) {
+    const todayPeriod = new Date().toISOString().substring(0, 7);
+    const targetPeriod = periodKey || todayPeriod;
+    const [targetYear, targetMonth] = targetPeriod.split('-').map(Number);
+    const defaultPaymentDate = `${targetYear}-${String(targetMonth).padStart(2, '0')}-05`;
+
+    // Filter incomes corresponding to the active profile (or without profile)
+    const profileIncomes = transactions.filter(t => 
+        t.type === 'income' && 
+        (t.profile === currentProfile || !t.profile)
+    );
+
+    // Get all distinct periods with income records
+    const periodsWithIncome = Array.from(new Set(
+        profileIncomes
+            .map(t => t.period || (t.date ? t.date.substring(0, 7) : ''))
+            .filter(Boolean)
+    )).sort();
+
+    // Find the latest period strictly prior to targetPeriod
+    const priorPeriods = periodsWithIncome.filter(p => p < targetPeriod);
+    let sourcePeriod = null;
+
+    if (priorPeriods.length > 0) {
+        sourcePeriod = priorPeriods[priorPeriods.length - 1];
+    } else if (periodsWithIncome.length > 0) {
+        sourcePeriod = periodsWithIncome[periodsWithIncome.length - 1];
+    }
+
+    const banner = document.getElementById('batch-income-source-banner');
+    const bannerText = document.getElementById('batch-income-source-banner-text');
+    const tbody = document.getElementById('batch-incomes-tbody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    let templateItems = [];
+
+    if (sourcePeriod) {
+        const sourceTxs = profileIncomes.filter(t => 
+            (t.period === sourcePeriod || (!t.period && t.date?.substring(0, 7) === sourcePeriod))
+        );
+
+        if (sourceTxs.length > 0) {
+            templateItems = sourceTxs.map(t => {
+                let paymentDate = defaultPaymentDate;
+                if (t.date && t.date.includes('-')) {
+                    const parts = t.date.split('-');
+                    if (parts.length >= 3) {
+                        const dayNum = parseInt(parts[2], 10);
+                        if (!isNaN(dayNum) && dayNum >= 1 && dayNum <= 31) {
+                            const daysInTargetMonth = new Date(targetYear, targetMonth, 0).getDate();
+                            const clampedDay = Math.min(dayNum, daysInTargetMonth);
+                            paymentDate = `${targetYear}-${String(targetMonth).padStart(2, '0')}-${String(clampedDay).padStart(2, '0')}`;
+                        }
+                    }
+                }
+
+                return {
+                    ref: t.reference || getCategoryLabel('income', t.category) || 'Ingreso General',
+                    cat: t.category || 'brokerage-administration',
+                    amount: Math.abs(Number(t.amount)) || 0,
+                    date: paymentDate,
+                    status: t.status || 'paid'
+                };
+            });
+
+            // Ordenar por prioridad de grupo de ingresos y luego por nombre
+            templateItems.sort((a, b) => {
+                const orderA = getIncomeCategoryOrder(a.cat);
+                const orderB = getIncomeCategoryOrder(b.cat);
+                if (orderA !== orderB) {
+                    return orderA - orderB;
+                }
+                return (a.ref || '').localeCompare(b.ref || '');
+            });
+        }
+    }
+
+    if (banner && bannerText) {
+        banner.style.display = 'flex';
+        if (sourcePeriod && templateItems.length > 0) {
+            const formattedSource = formatPeriodString(sourcePeriod);
+            const formattedTarget = formatPeriodString(targetPeriod);
+            if (sourcePeriod === targetPeriod) {
+                bannerText.innerHTML = `Mostrando los <strong>${templateItems.length} ingresos</strong> registrados en <strong>${formattedTarget}</strong>. Puedes editarlos o agregar nuevos antes de guardar.`;
+            } else {
+                bannerText.innerHTML = `Ingresos cargados automáticamente desde <strong>${formattedSource}</strong> (último mes con registros) para el período <strong>${formattedTarget}</strong>.`;
+            }
+        } else {
+            bannerText.innerHTML = `No hay ingresos registrados en meses anteriores. Puedes agregar tus ingresos de <strong>${formatPeriodString(targetPeriod)}</strong> con el botón <strong>+ Agregar Fila</strong>.`;
+        }
+    }
+
+    if (templateItems.length === 0) {
+        const emptyTr = document.createElement('tr');
+        emptyTr.id = 'batch-income-empty-row';
+        emptyTr.innerHTML = `
+            <td colspan="7" style="text-align: center; padding: 30px; color: var(--color-text-muted);">
+                <i data-lucide="inbox" style="width: 32px; height: 32px; margin-bottom: 8px; opacity: 0.6;"></i>
+                <p style="margin: 0; font-size: 0.88rem; font-weight: 500;">No hay ingresos registrados en meses anteriores para replicar.</p>
+                <button type="button" class="btn btn-secondary" id="btn-batch-income-add-first" style="margin-top: 10px; font-size: 0.8rem;">
+                    <i data-lucide="plus"></i> Agregar Primer Ingreso
+                </button>
+            </td>
+        `;
+        tbody.appendChild(emptyTr);
+        const addFirstBtn = emptyTr.querySelector('#btn-batch-income-add-first');
+        addFirstBtn?.addEventListener('click', addBatchIncomeRow);
+    } else {
+        let currentRenderGroup = null;
+        templateItems.forEach(item => {
+            const itemGroup = getIncomeCategoryGroup(item.cat);
+            if (itemGroup !== currentRenderGroup) {
+                currentRenderGroup = itemGroup;
+                const groupTr = document.createElement('tr');
+                groupTr.className = 'batch-group-header-row';
+                groupTr.innerHTML = `
+                    <td colspan="7" style="background: rgba(16, 185, 129, 0.08); padding: 7px 14px; font-size: 0.76rem; font-weight: 800; color: var(--color-income); letter-spacing: 0.5px; border-top: 1px solid rgba(255,255,255,0.06); border-bottom: 1px solid rgba(255,255,255,0.06);">
+                        <i data-lucide="folder" style="width: 12px; height: 12px; vertical-align: middle; margin-right: 6px;"></i>
+                        <span style="vertical-align: middle;">${escapeHtml(itemGroup)}</span>
+                    </td>
+                `;
+                tbody.appendChild(groupTr);
+            }
+
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td style="text-align: center;">
+                    <input type="checkbox" class="batch-income-row-check" checked>
+                </td>
+                <td>
+                    <input type="text" class="batch-table-input batch-ref-input" value="${escapeHtml(item.ref)}">
+                </td>
+                <td>
+                    <select class="batch-table-input batch-cat-select">
+                        ${getIncomeCategorySelectHtml(item.cat)}
+                    </select>
+                </td>
+                <td>
+                    <input type="number" class="batch-table-input batch-amount-input" value="${item.amount}" min="0" step="1000" style="text-align: right; font-weight: 700; color: var(--color-income);">
+                </td>
+                <td>
+                    <input type="date" class="batch-table-input batch-date-input" value="${item.date}">
+                </td>
+                <td>
+                    <select class="batch-table-input batch-status-select">
+                        <option value="paid" ${item.status === 'paid' ? 'selected' : ''}>Pagado</option>
+                        <option value="pending" ${item.status === 'pending' ? 'selected' : ''}>Pendiente</option>
+                    </select>
+                </td>
+                <td style="text-align: center;">
+                    <button type="button" class="btn btn-danger btn-icon btn-remove-batch-income-row" title="Eliminar fila">
+                        <i data-lucide="trash-2"></i>
+                    </button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    const inputs = tbody.querySelectorAll('.batch-amount-input, .batch-income-row-check');
+    inputs.forEach(input => {
+        input.addEventListener('input', updateBatchIncomeTotalSummary);
+        input.addEventListener('change', updateBatchIncomeTotalSummary);
+    });
+
+    const delBtns = tbody.querySelectorAll('.btn-remove-batch-income-row');
+    delBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            btn.closest('tr')?.remove();
+            updateBatchIncomeTotalSummary();
+            if (tbody.querySelectorAll('tr:not(#batch-income-empty-row):not(.batch-group-header-row)').length === 0) {
+                populateBatchIncomesTable(targetPeriod);
+            }
+        });
+    });
+
+    if (typeof lucide !== 'undefined' && lucide.createIcons) {
+        lucide.createIcons();
+    }
+
+    updateBatchIncomeTotalSummary();
+}
+
+function addBatchIncomeRow() {
+    const tbody = document.getElementById('batch-incomes-tbody');
+    if (!tbody) return;
+
+    const emptyRow = document.getElementById('batch-income-empty-row');
+    if (emptyRow) emptyRow.remove();
+
+    const monthInput = document.getElementById('batch-income-month-input');
+    const periodKey = (monthInput && monthInput.value) ? monthInput.value : new Date().toISOString().substring(0, 7);
+    const [year, month] = periodKey.split('-');
+    const defaultPaymentDate = `${year}-${month}-05`;
+
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+        <td style="text-align: center;">
+            <input type="checkbox" class="batch-income-row-check" checked>
+        </td>
+        <td>
+            <input type="text" class="batch-table-input batch-ref-input" placeholder="Nombre de cliente / propiedad / causa...">
+        </td>
+        <td>
+            <select class="batch-table-input batch-cat-select">
+                ${getIncomeCategorySelectHtml('brokerage-administration')}
+            </select>
+        </td>
+        <td>
+            <input type="number" class="batch-table-input batch-amount-input" value="0" min="0" step="1000" style="text-align: right; font-weight: 700; color: var(--color-income);">
+        </td>
+        <td>
+            <input type="date" class="batch-table-input batch-date-input" value="${defaultPaymentDate}">
+        </td>
+        <td>
+            <select class="batch-table-input batch-status-select">
+                <option value="paid">Pagado</option>
+                <option value="pending">Pendiente</option>
+            </select>
+        </td>
+        <td style="text-align: center;">
+            <button type="button" class="btn btn-danger btn-icon btn-remove-batch-income-row" title="Eliminar fila">
+                <i data-lucide="trash-2"></i>
+            </button>
+        </td>
+    `;
+
+    tbody.appendChild(tr);
+
+    const inputs = tr.querySelectorAll('.batch-amount-input, .batch-income-row-check');
+    inputs.forEach(input => {
+        input.addEventListener('input', updateBatchIncomeTotalSummary);
+        input.addEventListener('change', updateBatchIncomeTotalSummary);
+    });
+
+    const delBtn = tr.querySelector('.btn-remove-batch-income-row');
+    delBtn?.addEventListener('click', () => {
+        tr.remove();
+        updateBatchIncomeTotalSummary();
+    });
+
+    if (typeof lucide !== 'undefined' && lucide.createIcons) {
+        lucide.createIcons();
+    }
+
+    updateBatchIncomeTotalSummary();
+}
+
+function updateBatchIncomeTotalSummary() {
+    let total = 0;
+    let selectedCount = 0;
+    const tbody = document.getElementById('batch-incomes-tbody');
+    if (!tbody) return;
+    const rows = tbody.querySelectorAll('tr:not(#batch-income-empty-row):not(.batch-group-header-row)');
+    
+    rows.forEach(tr => {
+        const check = tr.querySelector('.batch-income-row-check');
+        const amountInput = tr.querySelector('.batch-amount-input');
+        
+        if (check && check.checked && amountInput) {
+            const val = parseFloat(amountInput.value) || 0;
+            total += Math.abs(val);
+            selectedCount++;
+        }
+    });
+
+    const summaryLbl = document.getElementById('batch-income-total-summary');
+    if (summaryLbl) {
+        summaryLbl.textContent = `Total Ingresos (${selectedCount}): ${formatCurrency(total)}`;
+    }
+}
+
+function saveBatchIncomes() {
+    if (!currentUser) {
+        showToast('Debes iniciar sesión para registrar ingresos.', 'error');
+        return;
+    }
+
+    const monthInput = document.getElementById('batch-income-month-input');
+    const periodKey = (monthInput && monthInput.value) ? monthInput.value : new Date().toISOString().substring(0, 7);
+    const tbody = document.getElementById('batch-incomes-tbody');
+    if (!tbody) return;
+    const rows = tbody.querySelectorAll('tr:not(#batch-income-empty-row):not(.batch-group-header-row)');
+    
+    const itemsToSave = [];
+
+    rows.forEach(tr => {
+        const check = tr.querySelector('.batch-income-row-check');
+        if (check && check.checked) {
+            const refInput = tr.querySelector('.batch-ref-input');
+            const catSelect = tr.querySelector('.batch-cat-select');
+            const amountInput = tr.querySelector('.batch-amount-input');
+            const dateInput = tr.querySelector('.batch-date-input');
+            const statusSelect = tr.querySelector('.batch-status-select');
+
+            const reference = refInput ? refInput.value.trim() : '';
+            const category = catSelect ? catSelect.value : 'brokerage-administration';
+            const amount = amountInput ? Math.abs(parseFloat(amountInput.value) || 0) : 0;
+            const date = dateInput ? dateInput.value : `${periodKey}-05`;
+            const status = statusSelect ? statusSelect.value : 'paid';
+
+            if (reference && amount > 0) {
+                itemsToSave.push({
+                    reference,
+                    category,
+                    amount,
+                    date,
+                    period: periodKey,
+                    status
+                });
+            }
+        }
+    });
+
+    if (itemsToSave.length === 0) {
+        showToast('Por favor, selecciona al menos un ingreso con monto mayor a 0 para guardar.', 'error');
+        return;
+    }
+
+    const summaryLbl = document.getElementById('batch-income-total-summary');
+    const totalText = summaryLbl ? summaryLbl.textContent : '';
+    if (confirm(`Se registrarán ${itemsToSave.length} ingresos en el período ${formatPeriodString(periodKey)} por un total de ${totalText.replace(/Total Ingresos \(\d+\): /, '')}.\n\n¿Deseas continuar?`)) {
+        const saveBtn = document.getElementById('btn-save-batch-incomes');
+        if (saveBtn) {
+            saveBtn.disabled = true;
+            saveBtn.innerHTML = '<span>Guardando ingresos...</span>';
+        }
+
+        const promises = itemsToSave.map(item => {
+            const finalId = 'tx-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7);
+            const txRef = doc(db, "transactions", finalId);
+            return setDoc(txRef, {
+                id: finalId,
+                userId: currentUser.uid,
+                profile: currentProfile,
+                type: 'income',
+                category: item.category,
+                date: item.date,
+                period: item.period,
+                reference: item.reference,
+                amount: item.amount,
+                status: item.status,
+                notes: 'Carga masiva mensual de ingresos',
+                attachment: null
+            });
+        });
+
+        Promise.all(promises)
+            .then(() => {
+                showToast(`¡Se registraron ${itemsToSave.length} ingresos exitosamente en ${formatPeriodString(periodKey)}!`);
+                closeBatchIncomesModal();
+            })
+            .catch(err => {
+                showToast('Error al guardar ingresos masivos en la nube.', 'error');
+                console.error(err);
+            })
+            .finally(() => {
+                if (saveBtn) {
+                    saveBtn.disabled = false;
+                    saveBtn.innerHTML = '<i data-lucide="check-circle"></i><span>Guardar Todos los Ingresos</span>';
+                    if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons();
+                }
+            });
+    }
+}
+
 function exportToExcel() {
     if (typeof XLSX === 'undefined') {
         showToast('La biblioteca para exportar a Excel no se ha cargado aún.', 'error');
@@ -3271,6 +3774,12 @@ function setupMobileControls() {
         closeDrawer();
     });
     
+    // Drawer Batch Incomes button
+    document.getElementById('drawer-btn-batch-incomes')?.addEventListener('click', () => {
+        closeDrawer();
+        openBatchIncomesModal();
+    });
+
     // Drawer Batch Expenses button
     document.getElementById('drawer-btn-batch-expenses')?.addEventListener('click', () => {
         closeDrawer();
@@ -3292,6 +3801,9 @@ function setupMobileControls() {
 }
 
 // Global Exports
+window.openBatchIncomesModal = openBatchIncomesModal;
+window.closeBatchIncomesModal = closeBatchIncomesModal;
+window.updateBatchIncomeTotalSummary = updateBatchIncomeTotalSummary;
 window.openBatchExpensesModal = openBatchExpensesModal;
 window.closeBatchExpensesModal = closeBatchExpensesModal;
 window.openModal = openModal;
