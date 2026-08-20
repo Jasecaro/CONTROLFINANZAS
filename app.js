@@ -243,6 +243,8 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if (id === 'btn-reload-batch-template') {
             const mi = document.getElementById('batch-month-input');
             populateBatchExpensesTable(mi ? mi.value : new Date().toISOString().substring(0, 7));
+        } else if (id === 'btn-do-print-pdf') {
+            printReportPdf();
         } else if (id === 'btn-open-modal') {
             openModal(false);
         } else if (id === 'btn-empty-add') {
@@ -1850,7 +1852,7 @@ function setupFilters() {
     if (elements.btnPrintReportsPdf) elements.btnPrintReportsPdf.addEventListener('click', openReportsPdfModal);
     if (elements.btnCloseReportsPdf) elements.btnCloseReportsPdf.addEventListener('click', closeReportsPdfModal);
     if (elements.btnCloseReportsPdfFoot) elements.btnCloseReportsPdfFoot.addEventListener('click', closeReportsPdfModal);
-    if (elements.btnDoPrintPdf) elements.btnDoPrintPdf.addEventListener('click', () => window.print());
+    if (elements.btnDoPrintPdf) elements.btnDoPrintPdf.addEventListener('click', printReportPdf);
     if (elements.reportsPdfModal) {
         elements.reportsPdfModal.addEventListener('click', (e) => {
             if (e.target === elements.reportsPdfModal) closeReportsPdfModal();
@@ -2486,6 +2488,102 @@ function openReportsPdfModal() {
 function closeReportsPdfModal() {
     elements.reportsPdfModal.classList.remove('active');
 }
+
+function printReportPdf() {
+    const printableArea = document.getElementById('reports-pdf-printable-area');
+    if (!printableArea) {
+        window.print();
+        return;
+    }
+
+    const reportHtml = printableArea.innerHTML;
+    const officeName = (document.getElementById('sidebar-logo-title') || {}).textContent || "Caro & Sebastiani";
+    const periodSelect = document.getElementById('reports-pdf-period-select');
+    const periodText = (periodSelect && periodSelect.value !== 'all') ? formatPeriodString(periodSelect.value) : 'Consolidado';
+
+    // Create an isolated hidden iframe for 100% reliable, pristine PDF printing
+    let printFrame = document.getElementById('report-print-iframe');
+    if (printFrame) {
+        printFrame.remove();
+    }
+
+    printFrame = document.createElement('iframe');
+    printFrame.id = 'report-print-iframe';
+    printFrame.style.position = 'fixed';
+    printFrame.style.right = '0';
+    printFrame.style.bottom = '0';
+    printFrame.style.width = '0';
+    printFrame.style.height = '0';
+    printFrame.style.border = '0';
+    document.body.appendChild(printFrame);
+
+    const doc = printFrame.contentWindow.document;
+    doc.open();
+    doc.write(`
+        <!DOCTYPE html>
+        <html lang="es">
+        <head>
+            <meta charset="UTF-8">
+            <title>${escapeHtml(officeName)} - Informe Financiero (${escapeHtml(periodText)})</title>
+            <link rel="preconnect" href="https://fonts.googleapis.com">
+            <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+            <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+            <style>
+                @page {
+                    margin: 10mm 12mm;
+                    size: A4 portrait;
+                }
+                * {
+                    box-sizing: border-box;
+                    margin: 0;
+                    padding: 0;
+                }
+                body {
+                    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                    background: #ffffff !important;
+                    color: #0f172a !important;
+                    padding: 10px 14px;
+                    font-size: 10.5pt;
+                    line-height: 1.4;
+                    -webkit-print-color-adjust: exact !important;
+                    print-color-adjust: exact !important;
+                }
+                table {
+                    width: 100% !important;
+                    border-collapse: collapse !important;
+                    page-break-inside: auto !important;
+                }
+                tr {
+                    page-break-inside: avoid !important;
+                    page-break-after: auto !important;
+                }
+                thead {
+                    display: table-header-group !important;
+                }
+                th, td {
+                    vertical-align: middle;
+                }
+            </style>
+        </head>
+        <body>
+            ${reportHtml}
+        </body>
+        </html>
+    `);
+    doc.close();
+
+    setTimeout(() => {
+        try {
+            printFrame.contentWindow.focus();
+            printFrame.contentWindow.print();
+        } catch (e) {
+            console.error("Error al imprimir via iframe, fallback:", e);
+            window.print();
+        }
+    }, 300);
+}
+
+window.printReportPdf = printReportPdf;
 
 // --- 12. CARGA MASIVA DE GASTOS (BATCH EXPENSE LOADER) ---
 function openBatchExpensesModal() {

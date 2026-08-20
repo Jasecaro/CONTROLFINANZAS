@@ -2366,22 +2366,29 @@ body.theme-laboral {
    ========================================================================== */
 @media print {
     @page {
-        margin: 12mm 15mm;
-        size: auto;
+        margin: 10mm 12mm;
+        size: portrait;
     }
 
-    body {
+    html, body {
         background: #ffffff !important;
         color: #0f172a !important;
-        font-size: 11pt !important;
+        width: 100% !important;
+        height: auto !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        overflow: visible !important;
+        font-size: 10.5pt !important;
     }
 
-    /* Hide everything except printable area */
-    body > *:not(.modal-overlay.active),
+    /* Hide UI Chrome */
+    .app-container,
     .sidebar,
     .topbar,
     .mobile-bottom-nav,
     .mobile-drawer,
+    .toast,
+    .login-overlay,
     .modal-overlay:not(#reports-pdf-modal),
     .modal-header,
     .modal-footer,
@@ -2391,29 +2398,43 @@ body.theme-laboral {
     }
 
     #reports-pdf-modal {
-        position: static !important;
         display: block !important;
+        position: static !important;
         background: transparent !important;
         padding: 0 !important;
-        z-index: 9999 !important;
+        margin: 0 !important;
+        width: 100% !important;
+        height: auto !important;
+        overflow: visible !important;
+        box-shadow: none !important;
+        border: none !important;
     }
 
     #reports-pdf-modal .modal-card {
+        display: block !important;
+        position: static !important;
         background: transparent !important;
         border: none !important;
         box-shadow: none !important;
         max-width: 100% !important;
         width: 100% !important;
-        padding: 0 !important;
         margin: 0 !important;
+        padding: 0 !important;
+        overflow: visible !important;
     }
 
     #reports-pdf-printable-area {
+        display: block !important;
+        position: static !important;
         max-height: none !important;
+        height: auto !important;
         overflow: visible !important;
-        padding: 0 !important;
+        padding: 10px 14px !important;
         background: #ffffff !important;
         color: #0f172a !important;
+        box-shadow: none !important;
+        border: none !important;
+        border-radius: 0 !important;
         -webkit-print-color-adjust: exact !important;
         print-color-adjust: exact !important;
     }
@@ -2421,6 +2442,7 @@ body.theme-laboral {
     table {
         page-break-inside: auto !important;
         width: 100% !important;
+        border-collapse: collapse !important;
     }
 
     tr {
