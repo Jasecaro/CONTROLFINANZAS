@@ -2330,3 +2330,25 @@ body.theme-laboral {
     box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
 }
 
+.batch-source-banner {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    background: rgba(99, 102, 241, 0.08);
+    border: 1px solid rgba(99, 102, 241, 0.25);
+    border-radius: var(--border-radius-md);
+    color: var(--color-text-main);
+    font-size: 0.83rem;
+    margin-bottom: 14px;
+    line-height: 1.4;
+}
+
+.batch-source-banner i {
+    color: var(--color-primary);
+    flex-shrink: 0;
+    width: 18px;
+    height: 18px;
+}
+
+

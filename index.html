@@ -17,7 +17,7 @@
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <!-- Lucide Icons CDN -->
     <script src="https://unpkg.com/lucide@latest"></script>
-    <link rel="stylesheet" href="styles.css?v=3">
+    <link rel="stylesheet" href="styles.css?v=4">
 </head>
 <body class="dark-theme">
     <div class="app-container">
@@ -701,13 +701,18 @@
                         <input type="month" id="batch-month-input" class="form-select" style="padding: 6px 12px; width: auto; font-size: 0.82rem;">
                     </div>
                     <div style="display: flex; gap: 8px;">
-                        <button class="btn btn-secondary" id="btn-reload-batch-template" style="font-size: 0.78rem;">
-                            <i data-lucide="refresh-cw"></i> Recargar Plantilla
+                        <button class="btn btn-secondary" id="btn-reload-batch-template" style="font-size: 0.78rem;" title="Recargar sugerencias desde el mes anterior">
+                            <i data-lucide="refresh-cw"></i> Recargar Mes Anterior
                         </button>
                         <button class="btn btn-secondary" id="btn-add-batch-row" style="font-size: 0.78rem;">
                             <i data-lucide="plus"></i> + Agregar Fila
                         </button>
                     </div>
+                </div>
+
+                <div id="batch-source-banner" class="batch-source-banner" style="display: none;">
+                    <i data-lucide="sparkles"></i>
+                    <span id="batch-source-banner-text"></span>
                 </div>
 
                 <div class="table-container">
@@ -815,6 +820,6 @@
     </div>
 
     <!-- Main JavaScript Logic -->
-    <script type="module" src="app.js?v=8"></script>
+    <script type="module" src="app.js?v=9"></script>
 </body>
 </html>

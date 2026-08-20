@@ -288,6 +288,17 @@ function formatDateString(isoString) {
     return dateObj.toLocaleDateString('es-ES', options).replace('.', '');
 }
 
+// Helper: safe HTML escaping
+function escapeHtml(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
 function getMockTransactions() {
     const today = new Date();
     const subMonths = (m) => {
@@ -1678,29 +1689,45 @@ function duplicatePreviousMonthExpenses() {
     const today = new Date();
     const currentPeriod = today.toISOString().substring(0, 7);
     
-    const prevMonthDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-    const prevPeriod = prevMonthDate.toISOString().substring(0, 7);
+    const profileExpenses = transactions.filter(t => 
+        t.type === 'expense' && 
+        (t.profile === currentProfile || !t.profile)
+    );
+
+    const periodsWithExpenses = Array.from(new Set(
+        profileExpenses
+            .map(t => t.period || (t.date ? t.date.substring(0, 7) : ''))
+            .filter(Boolean)
+    )).sort();
+
+    const priorPeriods = periodsWithExpenses.filter(p => p < currentPeriod);
     
-    const prevExpenses = transactions.filter(t => t.period === prevPeriod && t.type === 'expense');
+    if (priorPeriods.length === 0) {
+        showToast(`No se encontraron gastos registrados en meses anteriores para clonar.`, 'error');
+        return;
+    }
+    
+    const prevPeriod = priorPeriods[priorPeriods.length - 1];
+    const prevExpenses = profileExpenses.filter(t => (t.period === prevPeriod || (!t.period && t.date?.substring(0, 7) === prevPeriod)));
     
     if (prevExpenses.length === 0) {
-        showToast(`No se encontraron gastos registrados en el mes anterior (${formatPeriodString(prevPeriod)}).`, 'error');
+        showToast(`No se encontraron gastos registrados en ${formatPeriodString(prevPeriod)}.`, 'error');
         return;
     }
     
     const currentExpensesRefs = transactions
-        .filter(t => t.period === currentPeriod && t.type === 'expense')
-        .map(t => t.reference.toLowerCase().trim());
+        .filter(t => (t.period === currentPeriod || (!t.period && t.date?.substring(0, 7) === currentPeriod)) && t.type === 'expense' && (t.profile === currentProfile || !t.profile))
+        .map(t => (t.reference || '').toLowerCase().trim());
         
-    const expensesToClone = prevExpenses.filter(t => !currentExpensesRefs.includes(t.reference.toLowerCase().trim()));
+    const expensesToClone = prevExpenses.filter(t => !currentExpensesRefs.includes((t.reference || '').toLowerCase().trim()));
     
     if (expensesToClone.length === 0) {
-        showToast(`Los gastos del mes anterior ya están registrados en el mes actual (${formatPeriodString(currentPeriod)}).`, 'info');
+        showToast(`Los gastos de ${formatPeriodString(prevPeriod)} ya están registrados en el mes actual (${formatPeriodString(currentPeriod)}).`, 'info');
         return;
     }
     
     const expenseSummaryText = expensesToClone.map(e => `• ${e.reference}: ${formatCurrency(e.amount)}`).join('\n');
-    if (confirm(`Se clonarán ${expensesToClone.length} gastos del mes anterior (${formatPeriodString(prevPeriod)}) al mes actual (${formatPeriodString(currentPeriod)}):\n\n${expenseSummaryText}\n\n¿Deseas continuar?`)) {
+    if (confirm(`Se clonarán ${expensesToClone.length} gastos desde ${formatPeriodString(prevPeriod)} al mes actual (${formatPeriodString(currentPeriod)}):\n\n${expenseSummaryText}\n\n¿Deseas continuar?`)) {
         const todayStr = today.toISOString().substring(0, 10);
         const promises = expensesToClone.map(t => {
             const finalId = 'tx-' + Date.now() + Math.random().toString(36).substring(2, 7);
@@ -2212,7 +2239,9 @@ function openBatchExpensesModal() {
     const currentPeriod = today.toISOString().substring(0, 7);
     const monthInput = document.getElementById('batch-month-input');
     if (monthInput) {
-        monthInput.value = currentPeriod;
+        if (!monthInput.value) {
+            monthInput.value = currentPeriod;
+        }
         monthInput.onchange = () => populateBatchExpensesTable(monthInput.value);
     }
     
@@ -2255,101 +2284,158 @@ function getCategorySelectHtml(selectedVal = 'expense-rent') {
 }
 
 function populateBatchExpensesTable(periodKey) {
-    const defaultTemplateItems = [
-        { ref: 'Arriendo de Oficina', cat: 'expense-rent' },
-        { ref: 'Servicio de Luz (Enel)', cat: 'expense-luz' },
-        { ref: 'Servicio de Agua (Aguas Andinas)', cat: 'expense-agua' },
-        { ref: 'Internet & Telecomunicaciones (VTR)', cat: 'expense-internet' },
-        { ref: 'Suministros e Imprenta', cat: 'expense-supplies' },
-        { ref: 'Publicidad & Marketing', cat: 'expense-marketing' },
-        { ref: 'Sueldos & Honorarios Oficina', cat: 'expense-salaries' },
-        { ref: 'Impuestos / Contribuciones', cat: 'expense-taxes' },
-        { ref: 'Otros Gastos Oficina', cat: 'expense-other' }
-    ];
+    const todayPeriod = new Date().toISOString().substring(0, 7);
+    const targetPeriod = periodKey || todayPeriod;
+    const [targetYear, targetMonth] = targetPeriod.split('-').map(Number);
+    const defaultPaymentDate = `${targetYear}-${String(targetMonth).padStart(2, '0')}-05`;
 
-    // Find any additional custom references in past expenses
-    const pastExpenses = transactions.filter(t => t.type === 'expense');
-    const customRefs = new Set();
-    pastExpenses.forEach(t => {
-        if (t.reference) customRefs.add(t.reference.trim());
-    });
+    // Filter expenses corresponding to the active profile (or without profile)
+    const profileExpenses = transactions.filter(t => 
+        t.type === 'expense' && 
+        (t.profile === currentProfile || !t.profile)
+    );
 
-    customRefs.forEach(ref => {
-        const exists = defaultTemplateItems.some(item => item.ref.toLowerCase() === ref.toLowerCase());
-        if (!exists) {
-            const pastMatching = pastExpenses.filter(t => t.reference && t.reference.toLowerCase().trim() === ref.toLowerCase());
-            pastMatching.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
-            const pastTx = pastMatching[0];
-            defaultTemplateItems.push({
-                ref: ref,
-                cat: pastTx ? pastTx.category : 'expense-other'
-            });
-        }
-    });
+    // Get all distinct periods with expense records
+    const periodsWithExpenses = Array.from(new Set(
+        profileExpenses
+            .map(t => t.period || (t.date ? t.date.substring(0, 7) : ''))
+            .filter(Boolean)
+    )).sort();
 
-    // Default payment date for the selected period
-    const [year, month] = (periodKey || new Date().toISOString().substring(0, 7)).split('-');
-    const defaultPaymentDate = `${year}-${month}-05`;
+    // Find the latest period strictly prior to targetPeriod
+    const priorPeriods = periodsWithExpenses.filter(p => p < targetPeriod);
+    let sourcePeriod = null;
 
+    if (priorPeriods.length > 0) {
+        sourcePeriod = priorPeriods[priorPeriods.length - 1];
+    } else if (periodsWithExpenses.length > 0) {
+        // If there's no period before targetPeriod, use the latest period recorded in history
+        sourcePeriod = periodsWithExpenses[periodsWithExpenses.length - 1];
+    }
+
+    const banner = document.getElementById('batch-source-banner');
+    const bannerText = document.getElementById('batch-source-banner-text');
     const tbody = document.getElementById('batch-expenses-tbody');
     if (!tbody) return;
     tbody.innerHTML = '';
 
-    defaultTemplateItems.forEach(item => {
-        // Find last registered amount for this reference (most recent transaction)
-        const pastMatching = pastExpenses.filter(t => t.reference && t.reference.toLowerCase().trim() === item.ref.toLowerCase().trim());
-        pastMatching.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
-        const lastTx = pastMatching[0];
-        const lastAmount = lastTx ? Number(lastTx.amount) : 0;
+    let templateItems = [];
 
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-            <td style="text-align: center;">
-                <input type="checkbox" class="batch-row-check" checked>
-            </td>
-            <td>
-                <input type="text" class="batch-table-input batch-ref-input" value="${item.ref}">
-            </td>
-            <td>
-                <select class="batch-table-input batch-cat-select">
-                    ${getCategorySelectHtml(item.cat)}
-                </select>
-            </td>
-            <td>
-                <input type="number" class="batch-table-input batch-amount-input" value="${lastAmount}" min="0" step="1000" style="text-align: right; font-weight: 700;">
-            </td>
-            <td>
-                <input type="date" class="batch-table-input batch-date-input" value="${defaultPaymentDate}">
-            </td>
-            <td>
-                <select class="batch-table-input batch-status-select">
-                    <option value="paid">Pagado</option>
-                    <option value="pending">Pendiente</option>
-                </select>
-            </td>
-            <td style="text-align: center;">
-                <button type="button" class="btn btn-danger btn-icon btn-remove-batch-row" title="Eliminar fila">
-                    <i data-lucide="trash-2"></i>
+    if (sourcePeriod) {
+        // Get all expenses from that source period
+        const sourceTxs = profileExpenses.filter(t => 
+            (t.period === sourcePeriod || (!t.period && t.date?.substring(0, 7) === sourcePeriod))
+        );
+
+        if (sourceTxs.length > 0) {
+            templateItems = sourceTxs.map(t => {
+                // Determine day of month from the original transaction
+                let paymentDate = defaultPaymentDate;
+                if (t.date && t.date.includes('-')) {
+                    const parts = t.date.split('-');
+                    if (parts.length >= 3) {
+                        const dayNum = parseInt(parts[2], 10);
+                        if (!isNaN(dayNum) && dayNum >= 1 && dayNum <= 31) {
+                            const daysInTargetMonth = new Date(targetYear, targetMonth, 0).getDate();
+                            const clampedDay = Math.min(dayNum, daysInTargetMonth);
+                            paymentDate = `${targetYear}-${String(targetMonth).padStart(2, '0')}-${String(clampedDay).padStart(2, '0')}`;
+                        }
+                    }
+                }
+
+                return {
+                    ref: t.reference || getCategoryLabel('expense', t.category) || 'Gasto General',
+                    cat: t.category || 'expense-other',
+                    amount: Math.abs(Number(t.amount)) || 0,
+                    date: paymentDate,
+                    status: t.status || 'paid'
+                };
+            });
+        }
+    }
+
+    if (banner && bannerText) {
+        banner.style.display = 'flex';
+        if (sourcePeriod && templateItems.length > 0) {
+            const formattedSource = formatPeriodString(sourcePeriod);
+            const formattedTarget = formatPeriodString(targetPeriod);
+            if (sourcePeriod === targetPeriod) {
+                bannerText.innerHTML = `Mostrando los <strong>${templateItems.length} gastos</strong> registrados en <strong>${formattedTarget}</strong>. Puedes editarlos o agregar nuevos antes de guardar.`;
+            } else {
+                bannerText.innerHTML = `Gastos cargados automáticamente desde <strong>${formattedSource}</strong> (último mes con registros) para el período <strong>${formattedTarget}</strong>.`;
+            }
+        } else {
+            bannerText.innerHTML = `No hay gastos registrados en meses anteriores. Puedes agregar tus gastos de <strong>${formatPeriodString(targetPeriod)}</strong> con el botón <strong>+ Agregar Fila</strong>.`;
+        }
+    }
+
+    if (templateItems.length === 0) {
+        const emptyTr = document.createElement('tr');
+        emptyTr.id = 'batch-empty-row';
+        emptyTr.innerHTML = `
+            <td colspan="7" style="text-align: center; padding: 30px; color: var(--color-text-muted);">
+                <i data-lucide="inbox" style="width: 32px; height: 32px; margin-bottom: 8px; opacity: 0.6;"></i>
+                <p style="margin: 0; font-size: 0.88rem; font-weight: 500;">No hay gastos registrados en meses anteriores para replicar.</p>
+                <button type="button" class="btn btn-secondary" id="btn-batch-add-first" style="margin-top: 10px; font-size: 0.8rem;">
+                    <i data-lucide="plus"></i> Agregar Primer Gasto
                 </button>
             </td>
         `;
+        tbody.appendChild(emptyTr);
+        const addFirstBtn = emptyTr.querySelector('#btn-batch-add-first');
+        addFirstBtn?.addEventListener('click', addBatchExpenseRow);
+    } else {
+        templateItems.forEach(item => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td style="text-align: center;">
+                    <input type="checkbox" class="batch-row-check" checked>
+                </td>
+                <td>
+                    <input type="text" class="batch-table-input batch-ref-input" value="${escapeHtml(item.ref)}">
+                </td>
+                <td>
+                    <select class="batch-table-input batch-cat-select">
+                        ${getCategorySelectHtml(item.cat)}
+                    </select>
+                </td>
+                <td>
+                    <input type="number" class="batch-table-input batch-amount-input" value="${item.amount}" min="0" step="1000" style="text-align: right; font-weight: 700;">
+                </td>
+                <td>
+                    <input type="date" class="batch-table-input batch-date-input" value="${item.date}">
+                </td>
+                <td>
+                    <select class="batch-table-input batch-status-select">
+                        <option value="paid" ${item.status === 'paid' ? 'selected' : ''}>Pagado</option>
+                        <option value="pending" ${item.status === 'pending' ? 'selected' : ''}>Pendiente</option>
+                    </select>
+                </td>
+                <td style="text-align: center;">
+                    <button type="button" class="btn btn-danger btn-icon btn-remove-batch-row" title="Eliminar fila">
+                        <i data-lucide="trash-2"></i>
+                    </button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
 
-        tbody.appendChild(tr);
-    });
-
-    // Attach live change listeners for inputs
+    // Live update listeners
     const inputs = tbody.querySelectorAll('.batch-amount-input, .batch-row-check');
     inputs.forEach(input => {
         input.addEventListener('input', updateBatchTotalSummary);
         input.addEventListener('change', updateBatchTotalSummary);
     });
 
-    // Attach row delete triggers
     const delBtns = tbody.querySelectorAll('.btn-remove-batch-row');
     delBtns.forEach(btn => {
         btn.addEventListener('click', () => {
             btn.closest('tr')?.remove();
             updateBatchTotalSummary();
+            if (tbody.querySelectorAll('tr:not(#batch-empty-row)').length === 0) {
+                populateBatchExpensesTable(targetPeriod);
+            }
         });
     });
 
@@ -2361,6 +2447,13 @@ function populateBatchExpensesTable(periodKey) {
 }
 
 function addBatchExpenseRow() {
+    const tbody = document.getElementById('batch-expenses-tbody');
+    if (!tbody) return;
+
+    // Remove empty row placeholder if present
+    const emptyRow = document.getElementById('batch-empty-row');
+    if (emptyRow) emptyRow.remove();
+
     const monthInput = document.getElementById('batch-month-input');
     const periodKey = (monthInput && monthInput.value) ? monthInput.value : new Date().toISOString().substring(0, 7);
     const [year, month] = periodKey.split('-');
@@ -2398,8 +2491,6 @@ function addBatchExpenseRow() {
         </td>
     `;
 
-    const tbody = document.getElementById('batch-expenses-tbody');
-    if (!tbody) return;
     tbody.appendChild(tr);
 
     const inputs = tr.querySelectorAll('.batch-amount-input, .batch-row-check');
@@ -2417,13 +2508,16 @@ function addBatchExpenseRow() {
     if (typeof lucide !== 'undefined' && lucide.createIcons) {
         lucide.createIcons();
     }
+
+    updateBatchTotalSummary();
 }
 
 function updateBatchTotalSummary() {
     let total = 0;
+    let selectedCount = 0;
     const tbody = document.getElementById('batch-expenses-tbody');
     if (!tbody) return;
-    const rows = tbody.querySelectorAll('tr');
+    const rows = tbody.querySelectorAll('tr:not(#batch-empty-row)');
     
     rows.forEach(tr => {
         const check = tr.querySelector('.batch-row-check');
@@ -2432,12 +2526,13 @@ function updateBatchTotalSummary() {
         if (check && check.checked && amountInput) {
             const val = parseFloat(amountInput.value) || 0;
             total += Math.abs(val);
+            selectedCount++;
         }
     });
 
     const summaryLbl = document.getElementById('batch-total-summary');
     if (summaryLbl) {
-        summaryLbl.textContent = `Total Gastos: ${formatCurrency(total)}`;
+        summaryLbl.textContent = `Total Gastos (${selectedCount}): ${formatCurrency(total)}`;
     }
 }
 
@@ -2451,7 +2546,7 @@ function saveBatchExpenses() {
     const periodKey = (monthInput && monthInput.value) ? monthInput.value : new Date().toISOString().substring(0, 7);
     const tbody = document.getElementById('batch-expenses-tbody');
     if (!tbody) return;
-    const rows = tbody.querySelectorAll('tr');
+    const rows = tbody.querySelectorAll('tr:not(#batch-empty-row)');
     
     const itemsToSave = [];
 
@@ -2489,8 +2584,8 @@ function saveBatchExpenses() {
     }
 
     const summaryLbl = document.getElementById('batch-total-summary');
-    const totalText = summaryLbl ? summaryLbl.textContent.replace('Total Gastos: ', '') : '';
-    if (confirm(`Se registrarán ${itemsToSave.length} gastos en el período ${formatPeriodString(periodKey)} por un total de ${totalText}.\n\n¿Deseas continuar?`)) {
+    const totalText = summaryLbl ? summaryLbl.textContent : '';
+    if (confirm(`Se registrarán ${itemsToSave.length} gastos en el período ${formatPeriodString(periodKey)} por un total de ${totalText.replace(/Total Gastos \(\d+\): /, '')}.\n\n¿Deseas continuar?`)) {
         const saveBtn = document.getElementById('btn-save-batch-expenses');
         if (saveBtn) {
             saveBtn.disabled = true;
@@ -2518,7 +2613,7 @@ function saveBatchExpenses() {
 
         Promise.all(promises)
             .then(() => {
-                showToast(`¡Se registraron ${itemsToSave.length} gastos exitosamente en la nube!`);
+                showToast(`¡Se registraron ${itemsToSave.length} gastos exitosamente en ${formatPeriodString(periodKey)}!`);
                 closeBatchExpensesModal();
             })
             .catch(err => {
