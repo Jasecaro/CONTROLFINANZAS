@@ -39,15 +39,26 @@ const CATEGORIES = {
         { value: 'judicial-notary', label: 'Trámites Notariales', group: 'Judicial' }
     ],
     expense: [
-        { value: 'expense-rent', label: 'Arriendo de Oficina', group: 'Oficina' },
-        { value: 'expense-luz', label: 'Servicio de Luz', group: 'Oficina' },
-        { value: 'expense-agua', label: 'Servicio de Agua', group: 'Oficina' },
-        { value: 'expense-internet', label: 'Internet & Telecomunicaciones', group: 'Oficina' },
-        { value: 'expense-supplies', label: 'Suministros e Imprenta', group: 'Oficina' },
-        { value: 'expense-marketing', label: 'Publicidad & Marketing', group: 'Oficina' },
-        { value: 'expense-salaries', label: 'Sueldos & Honorarios', group: 'Oficina' },
-        { value: 'expense-taxes', label: 'Impuestos', group: 'Oficina' },
-        { value: 'expense-other', label: 'Otros Gastos', group: 'Oficina' }
+        // 1. Servicios Básicos & Arriendo
+        { value: 'expense-luz', label: 'Servicio de Luz', group: 'Servicios Básicos & Arriendo', order: 1 },
+        { value: 'expense-agua', label: 'Servicio de Agua', group: 'Servicios Básicos & Arriendo', order: 2 },
+        { value: 'expense-internet', label: 'Internet & Telecomunicaciones', group: 'Servicios Básicos & Arriendo', order: 3 },
+        { value: 'expense-rent', label: 'Arriendo de Oficina', group: 'Servicios Básicos & Arriendo', order: 4 },
+        
+        // 2. Personal & Sueldos
+        { value: 'expense-salaries', label: 'Sueldos & Honorarios', group: 'Personal & Sueldos', order: 10 },
+        
+        // 3. Operaciones & Suministros
+        { value: 'expense-supplies', label: 'Suministros e Imprenta', group: 'Operaciones & Suministros', order: 20 },
+        
+        // 4. Marketing & Publicidad
+        { value: 'expense-marketing', label: 'Publicidad & Marketing', group: 'Marketing & Publicidad', order: 30 },
+        
+        // 5. Impuestos & Tributario
+        { value: 'expense-taxes', label: 'Impuestos & Contribuciones', group: 'Impuestos & Tributario', order: 40 },
+        
+        // 6. Otros Gastos
+        { value: 'expense-other', label: 'Otros Gastos', group: 'Otros Gastos', order: 99 }
     ]
 };
 
@@ -297,6 +308,18 @@ function escapeHtml(str) {
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#039;');
+}
+
+// Helper: get sorting order of an expense category
+function getExpenseCategoryOrder(catValue) {
+    const found = CATEGORIES.expense.find(c => c.value === catValue);
+    return found ? (found.order || 50) : 100;
+}
+
+// Helper: get group name of an expense category
+function getExpenseCategoryGroup(catValue) {
+    const found = CATEGORIES.expense.find(c => c.value === catValue);
+    return found ? found.group : 'Otros Gastos';
 }
 
 function getMockTransactions() {
@@ -2275,10 +2298,21 @@ window.openModal = openModal;
 window.closeModal = closeModal;
 
 function getCategorySelectHtml(selectedVal = 'expense-rent') {
-    let html = '';
+    const groups = {};
     CATEGORIES.expense.forEach(c => {
-        const isSel = c.value === selectedVal ? 'selected' : '';
-        html += `<option value="${c.value}" ${isSel}>${c.label}</option>`;
+        const groupName = c.group || 'Otros Gastos';
+        if (!groups[groupName]) groups[groupName] = [];
+        groups[groupName].push(c);
+    });
+
+    let html = '';
+    Object.keys(groups).forEach(groupName => {
+        html += `<optgroup label="${groupName}">`;
+        groups[groupName].forEach(c => {
+            const isSel = c.value === selectedVal ? 'selected' : '';
+            html += `<option value="${c.value}" ${isSel}>${c.label}</option>`;
+        });
+        html += `</optgroup>`;
     });
     return html;
 }
@@ -2351,6 +2385,16 @@ function populateBatchExpensesTable(periodKey) {
                     status: t.status || 'paid'
                 };
             });
+
+            // Ordenar por prioridad de grupo (Servicios -> Sueldos -> Operaciones -> Marketing -> Impuestos -> Otros) y luego por nombre
+            templateItems.sort((a, b) => {
+                const orderA = getExpenseCategoryOrder(a.cat);
+                const orderB = getExpenseCategoryOrder(b.cat);
+                if (orderA !== orderB) {
+                    return orderA - orderB;
+                }
+                return (a.ref || '').localeCompare(b.ref || '');
+            });
         }
     }
 
@@ -2385,7 +2429,22 @@ function populateBatchExpensesTable(periodKey) {
         const addFirstBtn = emptyTr.querySelector('#btn-batch-add-first');
         addFirstBtn?.addEventListener('click', addBatchExpenseRow);
     } else {
+        let currentRenderGroup = null;
         templateItems.forEach(item => {
+            const itemGroup = getExpenseCategoryGroup(item.cat);
+            if (itemGroup !== currentRenderGroup) {
+                currentRenderGroup = itemGroup;
+                const groupTr = document.createElement('tr');
+                groupTr.className = 'batch-group-header-row';
+                groupTr.innerHTML = `
+                    <td colspan="7" style="background: rgba(99, 102, 241, 0.08); padding: 7px 14px; font-size: 0.76rem; font-weight: 800; color: var(--color-primary); letter-spacing: 0.5px; border-top: 1px solid rgba(255,255,255,0.06); border-bottom: 1px solid rgba(255,255,255,0.06);">
+                        <i data-lucide="folder" style="width: 12px; height: 12px; vertical-align: middle; margin-right: 6px;"></i>
+                        <span style="vertical-align: middle;">${escapeHtml(itemGroup)}</span>
+                    </td>
+                `;
+                tbody.appendChild(groupTr);
+            }
+
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td style="text-align: center;">
@@ -2433,7 +2492,7 @@ function populateBatchExpensesTable(periodKey) {
         btn.addEventListener('click', () => {
             btn.closest('tr')?.remove();
             updateBatchTotalSummary();
-            if (tbody.querySelectorAll('tr:not(#batch-empty-row)').length === 0) {
+            if (tbody.querySelectorAll('tr:not(#batch-empty-row):not(.batch-group-header-row)').length === 0) {
                 populateBatchExpensesTable(targetPeriod);
             }
         });

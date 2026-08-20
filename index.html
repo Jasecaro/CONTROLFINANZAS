@@ -17,7 +17,7 @@
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <!-- Lucide Icons CDN -->
     <script src="https://unpkg.com/lucide@latest"></script>
-    <link rel="stylesheet" href="styles.css?v=4">
+    <link rel="stylesheet" href="styles.css?v=5">
 </head>
 <body class="dark-theme">
     <div class="app-container">
@@ -295,15 +295,25 @@
                                         <option value="brokerage-rental">Comisión por Arriendo</option>
                                         <option value="brokerage-administration">Administración de Propiedades</option>
                                     </optgroup>
-                                    <optgroup label="Gastos de Oficina">
-                                        <option value="expense-rent">Arriendo de Oficina</option>
+                                    <optgroup label="Servicios Básicos & Arriendo">
                                         <option value="expense-luz">Servicio de Luz</option>
                                         <option value="expense-agua">Servicio de Agua</option>
                                         <option value="expense-internet">Internet & Telecomunicaciones</option>
+                                        <option value="expense-rent">Arriendo de Oficina</option>
+                                    </optgroup>
+                                    <optgroup label="Personal & Sueldos">
+                                        <option value="expense-salaries">Sueldos & Honorarios</option>
+                                    </optgroup>
+                                    <optgroup label="Operaciones & Suministros">
                                         <option value="expense-supplies">Suministros e Imprenta</option>
+                                    </optgroup>
+                                    <optgroup label="Marketing & Publicidad">
                                         <option value="expense-marketing">Publicidad & Marketing</option>
-                                        <option value="expense-salaries">Sueldos & Honorarios Oficina</option>
-                                        <option value="expense-taxes">Impuestos</option>
+                                    </optgroup>
+                                    <optgroup label="Impuestos & Tributario">
+                                        <option value="expense-taxes">Impuestos & Contribuciones</option>
+                                    </optgroup>
+                                    <optgroup label="Otros Gastos">
                                         <option value="expense-other">Otros Gastos</option>
                                     </optgroup>
                                 </select>
@@ -820,6 +830,6 @@
     </div>
 
     <!-- Main JavaScript Logic -->
-    <script type="module" src="app.js?v=9"></script>
+    <script type="module" src="app.js?v=10"></script>
 </body>
 </html>
