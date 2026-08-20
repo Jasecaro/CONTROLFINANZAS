@@ -114,6 +114,7 @@ const elements = {
     
     get reportsPdfModal() { return document.getElementById('reports-pdf-modal'); },
     get reportsPdfPrintableArea() { return document.getElementById('reports-pdf-printable-area'); },
+    get reportsPdfPeriodSelect() { return document.getElementById('reports-pdf-period-select'); },
     get btnCloseReportsPdf() { return document.getElementById('btn-close-reports-pdf'); },
     get btnCloseReportsPdfFoot() { return document.getElementById('btn-close-reports-pdf-foot'); },
     get btnDoPrintPdf() { return document.getElementById('btn-do-print-pdf'); },
@@ -2149,9 +2150,15 @@ function exportToCSV() {
 }
 
 // --- PDF EXECUTIVE REPORT GENERATOR ---
-function openReportsPdfModal() {
-    if (transactions.length === 0) {
-        showToast('No hay transacciones registradas para generar el reporte.', 'error');
+function renderPdfReportContent(selectedPeriod = 'all') {
+    const profileTxs = transactions.filter(t => t.profile === currentProfile || !t.profile);
+    if (profileTxs.length === 0) {
+        elements.reportsPdfPrintableArea.innerHTML = `
+            <div style="text-align: center; padding: 40px; color: #64748b;">
+                <p style="font-size: 1.1rem; font-weight: 700; margin-bottom: 8px;">No hay transacciones registradas para este perfil.</p>
+                <p style="font-size: 0.85rem;">Agrega ingresos o gastos para visualizar y exportar tu informe financiero.</p>
+            </div>
+        `;
         return;
     }
 
@@ -2159,59 +2166,116 @@ function openReportsPdfModal() {
     const profileLabel = currentProfile === 'empresa' ? 'Empresa / Oficina' : 'Personal';
     const officeName = (document.getElementById('sidebar-logo-title') || {}).textContent || "Caro & Sebastiani";
 
+    // Populate period selector options if needed
+    const periodSelect = document.getElementById('reports-pdf-period-select');
+    if (periodSelect) {
+        const allPeriods = Array.from(new Set(
+            profileTxs.map(t => t.period || (t.date ? t.date.substring(0, 7) : '')).filter(Boolean)
+        )).sort().reverse();
+
+        const currentOptions = Array.from(periodSelect.options).map(o => o.value);
+        const expectedOptions = ['all', ...allPeriods];
+
+        if (JSON.stringify(currentOptions) !== JSON.stringify(expectedOptions)) {
+            let selectHtml = `<option value="all" ${selectedPeriod === 'all' ? 'selected' : ''}>Todos los períodos (Consolidado Histórico)</option>`;
+            allPeriods.forEach(p => {
+                const isSel = p === selectedPeriod ? 'selected' : '';
+                selectHtml += `<option value="${p}" ${isSel}>${formatPeriodString(p)}</option>`;
+            });
+            periodSelect.innerHTML = selectHtml;
+        } else {
+            periodSelect.value = selectedPeriod;
+        }
+
+        periodSelect.onchange = (e) => {
+            renderPdfReportContent(e.target.value);
+        };
+    }
+
+    // Filter transactions according to selectedPeriod
+    let targetTxs = profileTxs;
+    let periodTitle = "Informe Financiero Ejecutivo y Estado de Cuenta (Consolidado)";
+    if (selectedPeriod !== 'all') {
+        targetTxs = profileTxs.filter(t => 
+            (t.period === selectedPeriod || (!t.period && t.date?.substring(0, 7) === selectedPeriod))
+        );
+        periodTitle = `Informe Financiero Ejecutivo - Período ${formatPeriodString(selectedPeriod)}`;
+    }
+
+    // Metrics calculation
     let totalIncome = 0;
     let totalExpenses = 0;
-    let pendingIncome = 0;
-    let pendingCount = 0;
-
-    transactions.forEach(tx => {
-        const amt = Number(tx.amount);
-        if (tx.type === 'income') {
-            totalIncome += amt;
-            if (tx.status === 'pending') {
-                pendingIncome += amt;
-                pendingCount++;
-            }
-        } else if (tx.type === 'expense') {
-            totalExpenses += amt;
-        }
+    targetTxs.forEach(tx => {
+        const amt = Number(tx.amount) || 0;
+        if (tx.type === 'income') totalIncome += amt;
+        else if (tx.type === 'expense') totalExpenses += amt;
     });
 
     const netResult = totalIncome - totalExpenses;
     const margin = totalIncome > 0 ? ((netResult / totalIncome) * 100).toFixed(1) : '0';
 
+    // Monthly summary for consolidated table (if selectedPeriod === 'all')
     const monthlySummary = {};
-    transactions.forEach(tx => {
-        const monthKey = tx.period;
+    profileTxs.forEach(tx => {
+        const monthKey = tx.period || (tx.date ? tx.date.substring(0, 7) : 'Sin fecha');
         if (!monthlySummary[monthKey]) {
             monthlySummary[monthKey] = { judicial: 0, brokerage: 0, expenses: 0 };
         }
-        const amt = Number(tx.amount);
+        const amt = Number(tx.amount) || 0;
         if (tx.type === 'income') {
-            if (tx.category.startsWith('judicial')) monthlySummary[monthKey].judicial += amt;
+            if (tx.category && tx.category.startsWith('judicial')) monthlySummary[monthKey].judicial += amt;
             else monthlySummary[monthKey].brokerage += amt;
         } else if (tx.type === 'expense') {
             monthlySummary[monthKey].expenses += amt;
         }
     });
-
     const sortedMonths = Object.keys(monthlySummary).sort().reverse();
 
-    const expenseTxs = transactions.filter(t => t.type === 'expense');
-    expenseTxs.sort((a, b) => {
-        if (b.period !== a.period) return b.period.localeCompare(a.period);
-        return Number(b.amount) - Number(a.amount);
+    // Prepare Incomes grouped and sorted
+    const incomeTxs = targetTxs.filter(t => t.type === 'income');
+    incomeTxs.sort((a, b) => {
+        const orderA = getIncomeCategoryOrder(a.category);
+        const orderB = getIncomeCategoryOrder(b.category);
+        if (orderA !== orderB) return orderA - orderB;
+        return (a.reference || '').localeCompare(b.reference || '');
     });
 
+    // Group Incomes
+    const incomeGroups = {};
+    incomeTxs.forEach(tx => {
+        const g = getIncomeCategoryGroup(tx.category);
+        if (!incomeGroups[g]) incomeGroups[g] = [];
+        incomeGroups[g].push(tx);
+    });
+
+    // Prepare Expenses grouped and sorted
+    const expenseTxs = targetTxs.filter(t => t.type === 'expense');
+    expenseTxs.sort((a, b) => {
+        const orderA = getExpenseCategoryOrder(a.category);
+        const orderB = getExpenseCategoryOrder(b.category);
+        if (orderA !== orderB) return orderA - orderB;
+        return (a.reference || '').localeCompare(b.reference || '');
+    });
+
+    // Group Expenses
+    const expenseGroups = {};
+    expenseTxs.forEach(tx => {
+        const g = getExpenseCategoryGroup(tx.category);
+        if (!expenseGroups[g]) expenseGroups[g] = [];
+        expenseGroups[g].push(tx);
+    });
+
+    // Build HTML
     let html = `
-        <div style="border-bottom: 2px solid #1e293b; padding-bottom: 16px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: flex-start;">
+        <div style="border-bottom: 2px solid #0f172a; padding-bottom: 16px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 10px;">
             <div>
-                <h1 style="font-size: 1.5rem; font-weight: 800; color: #0f172a; margin: 0; letter-spacing: -0.5px;">${officeName}</h1>
-                <p style="font-size: 0.82rem; color: #475569; margin-top: 4px; font-weight: 600;">Informe Financiero Ejecutivo y Estado de Cuenta</p>
+                <h1 style="font-size: 1.55rem; font-weight: 800; color: #0f172a; margin: 0; letter-spacing: -0.5px;">${escapeHtml(officeName)}</h1>
+                <p style="font-size: 0.85rem; color: #475569; margin-top: 4px; font-weight: 700;">${escapeHtml(periodTitle)}</p>
             </div>
             <div style="text-align: right; font-size: 0.78rem; color: #475569; line-height: 1.5;">
                 <p><strong>Fecha de Emisión:</strong> ${todayStr}</p>
-                <p><strong>Contexto:</strong> ${profileLabel}</p>
+                <p><strong>Contexto / Perfil:</strong> ${profileLabel}</p>
+                ${selectedPeriod !== 'all' ? `<p><strong>Período:</strong> ${formatPeriodString(selectedPeriod)}</p>` : `<p><strong>Cobertura:</strong> Todos los Períodos Registrados</p>`}
             </div>
         </div>
 
@@ -2234,81 +2298,165 @@ function openReportsPdfModal() {
                 <div style="font-size: 1.35rem; font-weight: 800; color: ${netResult >= 0 ? '#059669' : '#dc2626'}; margin-top: 4px;">${formatCurrency(netResult)}</div>
             </div>
         </div>
+    `;
 
-        <!-- Section 1: Consolidated Monthly Table -->
-        <h3 style="font-size: 1.05rem; font-weight: 800; color: #0f172a; margin-bottom: 10px; border-bottom: 2px solid #cbd5e1; padding-bottom: 6px;">1. Resumen Mensual Consolidado</h3>
-        <table style="width: 100%; border-collapse: collapse; margin-bottom: 28px; font-size: 0.83rem;">
+    // SECTION 1: Resumen Consolidado (if selectedPeriod === 'all')
+    if (selectedPeriod === 'all') {
+        html += `
+            <h3 style="font-size: 1.05rem; font-weight: 800; color: #0f172a; margin-bottom: 10px; border-bottom: 2px solid #cbd5e1; padding-bottom: 6px;">1. Resumen Mensual Consolidado</h3>
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 28px; font-size: 0.82rem;">
+                <thead>
+                    <tr style="background-color: #0f172a; color: #ffffff;">
+                        <th style="padding: 9px 12px; text-align: left;">Mes / Período</th>
+                        <th style="padding: 9px 12px; text-align: right;">Ing. Corretaje</th>
+                        <th style="padding: 9px 12px; text-align: right;">Ing. Judiciales</th>
+                        <th style="padding: 9px 12px; text-align: right;">Gastos Totales</th>
+                        <th style="padding: 9px 12px; text-align: right;">Resultado Neto</th>
+                        <th style="padding: 9px 12px; text-align: center;">Margen</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+
+        sortedMonths.forEach((m, idx) => {
+            const item = monthlySummary[m];
+            const totInc = item.judicial + item.brokerage;
+            const net = totInc - item.expenses;
+            const mPct = totInc > 0 ? ((net / totInc) * 100).toFixed(0) + '%' : '0%';
+            const bg = idx % 2 === 0 ? '#ffffff' : '#f8fafc';
+
+            html += `
+                <tr style="background-color: ${bg}; border-bottom: 1px solid #e2e8f0;">
+                    <td style="padding: 8px 12px; font-weight: 700; color: #0f172a;">${formatPeriodString(m)}</td>
+                    <td style="padding: 8px 12px; text-align: right; color: #047857; font-weight: 600;">${formatCurrency(item.brokerage)}</td>
+                    <td style="padding: 8px 12px; text-align: right; color: #4338ca; font-weight: 600;">${formatCurrency(item.judicial)}</td>
+                    <td style="padding: 8px 12px; text-align: right; color: #dc2626; font-weight: 600;">${formatCurrency(item.expenses)}</td>
+                    <td style="padding: 8px 12px; text-align: right; font-weight: 800; color: ${net >= 0 ? '#059669' : '#dc2626'};">${formatCurrency(net)}</td>
+                    <td style="padding: 8px 12px; text-align: center; font-weight: 700; color: ${net >= 0 ? '#059669' : '#dc2626'};">${mPct}</td>
+                </tr>
+            `;
+        });
+
+        html += `
+                </tbody>
+            </table>
+        `;
+    }
+
+    // SECTION 2: Desglose Detallado de Ingresos (Agrupados y Ordenados)
+    const incomeSectionNum = selectedPeriod === 'all' ? '2' : '1';
+    html += `
+        <h3 style="font-size: 1.05rem; font-weight: 800; color: #0f172a; margin-bottom: 10px; border-bottom: 2px solid #10b981; padding-bottom: 6px; display: flex; justify-content: space-between; align-items: center;">
+            <span>${incomeSectionNum}. Desglose Detallado de Ingresos ${selectedPeriod !== 'all' ? '(' + formatPeriodString(selectedPeriod) + ')' : ''}</span>
+            <span style="font-size: 0.88rem; color: #059669; font-weight: 800;">Total: ${formatCurrency(totalIncome)}</span>
+        </h3>
+        <table style="width: 100%; border-collapse: collapse; margin-bottom: 28px; font-size: 0.81rem;">
             <thead>
-                <tr style="background-color: #1e293b; color: #ffffff;">
-                    <th style="padding: 10px 12px; text-align: left;">Mes / Período</th>
-                    <th style="padding: 10px 12px; text-align: right;">Ing. Judiciales</th>
-                    <th style="padding: 10px 12px; text-align: right;">Ing. Corretaje</th>
-                    <th style="padding: 10px 12px; text-align: right;">Gastos Totales</th>
-                    <th style="padding: 10px 12px; text-align: right;">Resultado Neto</th>
-                    <th style="padding: 10px 12px; text-align: center;">Margen</th>
+                <tr style="background-color: #064e3b; color: #ffffff;">
+                    <th style="padding: 9px 12px; text-align: left; width: 14%;">Período</th>
+                    <th style="padding: 9px 12px; text-align: left; width: 14%;">Fecha</th>
+                    <th style="padding: 9px 12px; text-align: left; width: 22%;">Categoría</th>
+                    <th style="padding: 9px 12px; text-align: left; width: 28%;">Cliente / Propiedad / Causa</th>
+                    <th style="padding: 9px 12px; text-align: right; width: 12%;">Monto</th>
+                    <th style="padding: 9px 12px; text-align: center; width: 10%;">Estado</th>
                 </tr>
             </thead>
             <tbody>
     `;
 
-    sortedMonths.forEach((m, idx) => {
-        const item = monthlySummary[m];
-        const totInc = item.judicial + item.brokerage;
-        const net = totInc - item.expenses;
-        const mPct = totInc > 0 ? ((net / totInc) * 100).toFixed(0) + '%' : '0%';
-        const bg = idx % 2 === 0 ? '#ffffff' : '#f8fafc';
+    if (incomeTxs.length === 0) {
+        html += `<tr><td colspan="6" style="text-align:center; padding:18px; color:#64748b;">No hay ingresos registrados para este período.</td></tr>`;
+    } else {
+        Object.keys(incomeGroups).forEach(groupName => {
+            const groupList = incomeGroups[groupName];
+            const groupSubtotal = groupList.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
 
-        html += `
-            <tr style="background-color: ${bg}; border-bottom: 1px solid #e2e8f0;">
-                <td style="padding: 9px 12px; font-weight: 700; color: #0f172a;">${formatPeriodString(m)}</td>
-                <td style="padding: 9px 12px; text-align: right; color: #4338ca; font-weight: 600;">${formatCurrency(item.judicial)}</td>
-                <td style="padding: 9px 12px; text-align: right; color: #047857; font-weight: 600;">${formatCurrency(item.brokerage)}</td>
-                <td style="padding: 9px 12px; text-align: right; color: #dc2626; font-weight: 600;">${formatCurrency(item.expenses)}</td>
-                <td style="padding: 9px 12px; text-align: right; font-weight: 800; color: ${net >= 0 ? '#059669' : '#dc2626'};">${formatCurrency(net)}</td>
-                <td style="padding: 9px 12px; text-align: center; font-weight: 700; color: ${net >= 0 ? '#059669' : '#dc2626'};">${mPct}</td>
-            </tr>
-        `;
-    });
+            html += `
+                <tr style="background-color: #ecfdf5; border-top: 2px solid #a7f3d0; border-bottom: 1px solid #a7f3d0;">
+                    <td colspan="6" style="padding: 7px 12px; font-weight: 800; font-size: 0.78rem; color: #065f46; letter-spacing: 0.4px;">
+                        📁 ${escapeHtml(groupName.toUpperCase())} &nbsp;&bull;&nbsp; <span style="font-weight: 700; color: #047857;">Subtotal: ${formatCurrency(groupSubtotal)} (${groupList.length} registros)</span>
+                    </td>
+                </tr>
+            `;
+
+            groupList.forEach((tx, idx) => {
+                const bg = idx % 2 === 0 ? '#ffffff' : '#f8fafc';
+                html += `
+                    <tr style="background-color: ${bg}; border-bottom: 1px solid #e2e8f0;">
+                        <td style="padding: 8px 12px; font-weight: 600; color: #475569;">${formatPeriodString(tx.period)}</td>
+                        <td style="padding: 8px 12px; color: #64748b;">${formatDateString(tx.date)}</td>
+                        <td style="padding: 8px 12px; font-weight: 600; color: #0f172a;">${getCategoryLabel(tx.type, tx.category)}</td>
+                        <td style="padding: 8px 12px; font-weight: 700; color: #0f172a;">${escapeHtml(tx.reference)}</td>
+                        <td style="padding: 8px 12px; text-align: right; font-weight: 800; color: #059669;">${formatCurrency(tx.amount)}</td>
+                        <td style="padding: 8px 12px; text-align: center;">
+                            <span style="display:inline-block; padding: 2px 7px; border-radius: 4px; font-size: 0.72rem; font-weight: 700; background: ${tx.status === 'paid' ? '#dcfce7' : '#fef3c7'}; color: ${tx.status === 'paid' ? '#15803d' : '#b45309'};">
+                                ${tx.status === 'paid' ? 'Pagado' : 'Pendiente'}
+                            </span>
+                        </td>
+                    </tr>
+                `;
+            });
+        });
+    }
 
     html += `
             </tbody>
         </table>
+    `;
 
-        <!-- Section 2: Gastos Ordenados de Mayor a Menor -->
-        <h3 style="font-size: 1.05rem; font-weight: 800; color: #0f172a; margin-bottom: 10px; border-bottom: 2px solid #cbd5e1; padding-bottom: 6px;">2. Desglose de Gastos por Mes (Ordenados de Mayor a Menor Monto)</h3>
-        <table style="width: 100%; border-collapse: collapse; font-size: 0.81rem;">
+    // SECTION 3: Desglose Detallado de Gastos (Agrupados y Ordenados)
+    const expenseSectionNum = selectedPeriod === 'all' ? '3' : '2';
+    html += `
+        <h3 style="font-size: 1.05rem; font-weight: 800; color: #0f172a; margin-bottom: 10px; border-bottom: 2px solid #ef4444; padding-bottom: 6px; display: flex; justify-content: space-between; align-items: center;">
+            <span>${expenseSectionNum}. Desglose Detallado de Gastos ${selectedPeriod !== 'all' ? '(' + formatPeriodString(selectedPeriod) + ')' : ''}</span>
+            <span style="font-size: 0.88rem; color: #dc2626; font-weight: 800;">Total: ${formatCurrency(totalExpenses)}</span>
+        </h3>
+        <table style="width: 100%; border-collapse: collapse; margin-bottom: 24px; font-size: 0.81rem;">
             <thead>
-                <tr style="background-color: #1e293b; color: #ffffff;">
-                    <th style="padding: 10px 12px; text-align: left;">Período</th>
-                    <th style="padding: 10px 12px; text-align: left;">Fecha</th>
-                    <th style="padding: 10px 12px; text-align: left;">Categoría</th>
-                    <th style="padding: 10px 12px; text-align: left;">Proveedor / Concepto</th>
-                    <th style="padding: 10px 12px; text-align: right;">Monto Gasto</th>
-                    <th style="padding: 10px 12px; text-align: center;">Estado</th>
+                <tr style="background-color: #7f1d1d; color: #ffffff;">
+                    <th style="padding: 9px 12px; text-align: left; width: 14%;">Período</th>
+                    <th style="padding: 9px 12px; text-align: left; width: 14%;">Fecha</th>
+                    <th style="padding: 9px 12px; text-align: left; width: 22%;">Categoría</th>
+                    <th style="padding: 9px 12px; text-align: left; width: 28%;">Proveedor / Concepto</th>
+                    <th style="padding: 9px 12px; text-align: right; width: 12%;">Monto</th>
+                    <th style="padding: 9px 12px; text-align: center; width: 10%;">Estado</th>
                 </tr>
             </thead>
             <tbody>
     `;
 
     if (expenseTxs.length === 0) {
-        html += `<tr><td colspan="6" style="text-align:center; padding:15px; color:#64748b;">No hay gastos registrados.</td></tr>`;
+        html += `<tr><td colspan="6" style="text-align:center; padding:18px; color:#64748b;">No hay gastos registrados para este período.</td></tr>`;
     } else {
-        expenseTxs.forEach((tx, idx) => {
-            const bg = idx % 2 === 0 ? '#ffffff' : '#f8fafc';
+        Object.keys(expenseGroups).forEach(groupName => {
+            const groupList = expenseGroups[groupName];
+            const groupSubtotal = groupList.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
+
             html += `
-                <tr style="background-color: ${bg}; border-bottom: 1px solid #e2e8f0;">
-                    <td style="padding: 8px 12px; font-weight: 600; color: #475569;">${formatPeriodString(tx.period)}</td>
-                    <td style="padding: 8px 12px; color: #64748b;">${formatDateString(tx.date)}</td>
-                    <td style="padding: 8px 12px; font-weight: 600; color: #0f172a;">${getCategoryLabel(tx.type, tx.category)}</td>
-                    <td style="padding: 8px 12px; font-weight: 700; color: #0f172a;">${tx.reference}</td>
-                    <td style="padding: 8px 12px; text-align: right; font-weight: 800; color: #dc2626;">${formatCurrency(tx.amount)}</td>
-                    <td style="padding: 8px 12px; text-align: center;">
-                        <span style="display:inline-block; padding: 3px 8px; border-radius: 4px; font-size: 0.72rem; font-weight: 700; background: ${tx.status === 'paid' ? '#dcfce7' : '#fef3c7'}; color: ${tx.status === 'paid' ? '#15803d' : '#b45309'};">
-                            ${tx.status === 'paid' ? 'Pagado' : 'Pendiente'}
-                        </span>
+                <tr style="background-color: #fef2f2; border-top: 2px solid #fecaca; border-bottom: 1px solid #fecaca;">
+                    <td colspan="6" style="padding: 7px 12px; font-weight: 800; font-size: 0.78rem; color: #991b1b; letter-spacing: 0.4px;">
+                        📁 ${escapeHtml(groupName.toUpperCase())} &nbsp;&bull;&nbsp; <span style="font-weight: 700; color: #b91c1c;">Subtotal: ${formatCurrency(groupSubtotal)} (${groupList.length} registros)</span>
                     </td>
                 </tr>
             `;
+
+            groupList.forEach((tx, idx) => {
+                const bg = idx % 2 === 0 ? '#ffffff' : '#f8fafc';
+                html += `
+                    <tr style="background-color: ${bg}; border-bottom: 1px solid #e2e8f0;">
+                        <td style="padding: 8px 12px; font-weight: 600; color: #475569;">${formatPeriodString(tx.period)}</td>
+                        <td style="padding: 8px 12px; color: #64748b;">${formatDateString(tx.date)}</td>
+                        <td style="padding: 8px 12px; font-weight: 600; color: #0f172a;">${getCategoryLabel(tx.type, tx.category)}</td>
+                        <td style="padding: 8px 12px; font-weight: 700; color: #0f172a;">${escapeHtml(tx.reference)}</td>
+                        <td style="padding: 8px 12px; text-align: right; font-weight: 800; color: #dc2626;">${formatCurrency(tx.amount)}</td>
+                        <td style="padding: 8px 12px; text-align: center;">
+                            <span style="display:inline-block; padding: 2px 7px; border-radius: 4px; font-size: 0.72rem; font-weight: 700; background: ${tx.status === 'paid' ? '#dcfce7' : '#fef3c7'}; color: ${tx.status === 'paid' ? '#15803d' : '#b45309'};">
+                                ${tx.status === 'paid' ? 'Pagado' : 'Pendiente'}
+                            </span>
+                        </td>
+                    </tr>
+                `;
+            });
         });
     }
 
@@ -2318,7 +2466,21 @@ function openReportsPdfModal() {
     `;
 
     elements.reportsPdfPrintableArea.innerHTML = html;
+}
+
+function openReportsPdfModal() {
+    if (transactions.length === 0) {
+        showToast('No hay transacciones registradas para generar el reporte.', 'error');
+        return;
+    }
+
+    // Default period: active dashboard period or 'all'
+    const dashSelect = elements.dashboardPeriodSelect;
+    const initialPeriod = (dashSelect && dashSelect.value && dashSelect.value !== 'all') ? dashSelect.value : 'all';
+
+    renderPdfReportContent(initialPeriod);
     elements.reportsPdfModal.classList.add('active');
+    if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons();
 }
 
 function closeReportsPdfModal() {

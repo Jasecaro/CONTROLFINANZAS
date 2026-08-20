@@ -2361,4 +2361,76 @@ body.theme-laboral {
     opacity: 0.85;
 }
 
+/* ==========================================================================
+   PRINT / PDF EXPORT STYLES
+   ========================================================================== */
+@media print {
+    @page {
+        margin: 12mm 15mm;
+        size: auto;
+    }
+
+    body {
+        background: #ffffff !important;
+        color: #0f172a !important;
+        font-size: 11pt !important;
+    }
+
+    /* Hide everything except printable area */
+    body > *:not(.modal-overlay.active),
+    .sidebar,
+    .topbar,
+    .mobile-bottom-nav,
+    .mobile-drawer,
+    .modal-overlay:not(#reports-pdf-modal),
+    .modal-header,
+    .modal-footer,
+    .btn,
+    .theme-toggle-btn {
+        display: none !important;
+    }
+
+    #reports-pdf-modal {
+        position: static !important;
+        display: block !important;
+        background: transparent !important;
+        padding: 0 !important;
+        z-index: 9999 !important;
+    }
+
+    #reports-pdf-modal .modal-card {
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+        max-width: 100% !important;
+        width: 100% !important;
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+
+    #reports-pdf-printable-area {
+        max-height: none !important;
+        overflow: visible !important;
+        padding: 0 !important;
+        background: #ffffff !important;
+        color: #0f172a !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+
+    table {
+        page-break-inside: auto !important;
+        width: 100% !important;
+    }
+
+    tr {
+        page-break-inside: avoid !important;
+        page-break-after: auto !important;
+    }
+
+    thead {
+        display: table-header-group !important;
+    }
+}
+
 
